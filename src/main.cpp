@@ -105,7 +105,7 @@ struct Ray
 {
     Vector3f o;
     Vector3f d;
-    float tmax;
+    mutable float tmax;
 
     float time;
 
@@ -252,6 +252,8 @@ struct Scene
             if (t > r.tmax)
                 continue;
 
+            ray.tmax = t;
+
             Vector3f hit = r.evaluate(t);
             // TODO: refine hit point
             if ((hit.x == 0) && (hit.y == 0))
@@ -307,6 +309,7 @@ int main(int argc, char *argv[])
 
     Scene scene;
     scene.spheres.push_back(Sphere(Vector3f(), 1));
+    scene.spheres.push_back(Sphere(Vector3f(0, -1000, 0), 1000));
 
     Film film(Vector2i(300, 200));
     Camera camera(Vector3f(0, 0, 5), radians(60), &film);
