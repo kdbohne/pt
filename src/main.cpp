@@ -131,8 +131,184 @@ struct Ray
 
     float time;
 
+    Ray() : o(Vector3f()), d(Vector3f()), tmax(INFINITY), time(0) {}
+    Ray(const Vector3f &o, const Vector3f &d, float tmax, float time) : o(o), d(d), tmax(tmax), time(time) {}
+
     inline Vector3f evaluate(float t) const { return o + t * d; }
 };
+
+struct Matrix4x4
+{
+    float m[4][4];
+
+    Matrix4x4() : Matrix4x4(1, 0, 0, 0,
+                            0, 1, 0, 0,
+                            0, 0, 1, 0,
+                            0, 0, 0, 1)
+    {
+    }
+
+    Matrix4x4(float m00, float m10, float m20, float m30,
+              float m01, float m11, float m21, float m31,
+              float m02, float m12, float m22, float m32,
+              float m03, float m13, float m23, float m33)
+    {
+        m[0][0] = m00;
+        m[0][1] = m01;
+        m[0][2] = m02;
+        m[0][3] = m03;
+
+        m[1][0] = m10;
+        m[1][1] = m11;
+        m[1][2] = m12;
+        m[1][3] = m13;
+
+        m[2][0] = m20;
+        m[2][1] = m21;
+        m[2][2] = m22;
+        m[2][3] = m23;
+
+        m[3][0] = m30;
+        m[3][1] = m31;
+        m[3][2] = m32;
+        m[3][3] = m33;
+    }
+
+    Matrix4x4(float mat[4][4]) { std::memcpy(m, mat, sizeof(float) * 16); }
+};
+
+// NOTE: this is Inverse() from pbrt-v3.
+Matrix4x4 inverse(const Matrix4x4 &m)
+{
+    int indxc[4], indxr[4];
+    int ipiv[4] = {0, 0, 0, 0};
+    float minv[4][4];
+    std::memcpy(minv, m.m, 4 * 4 * sizeof(float));
+    for (int i = 0; i < 4; i++) {
+        int irow = 0, icol = 0;
+        float big = 0.f;
+        // Choose pivot
+        for (int j = 0; j < 4; j++) {
+            if (ipiv[j] != 1) {
+                for (int k = 0; k < 4; k++) {
+                    if (ipiv[k] == 0) {
+                        if (std::abs(minv[j][k]) >= big) {
+                            big = float(std::abs(minv[j][k]));
+                            irow = j;
+                            icol = k;
+                        }
+                    } else if (ipiv[k] > 1)
+                        error("Singular matrix in MatrixInvert%s", "");
+                }
+            }
+        }
+        ++ipiv[icol];
+        // Swap rows _irow_ and _icol_ for pivot
+        if (irow != icol) {
+            for (int k = 0; k < 4; ++k) std::swap(minv[irow][k], minv[icol][k]);
+        }
+        indxr[i] = irow;
+        indxc[i] = icol;
+        if (minv[icol][icol] == 0.f) error("Singular matrix in MatrixInvert%s", "");
+
+        // Set $m[icol][icol]$ to one by scaling row _icol_ appropriately
+        float pivinv = 1. / minv[icol][icol];
+        minv[icol][icol] = 1.;
+        for (int j = 0; j < 4; j++) minv[icol][j] *= pivinv;
+
+        // Subtract this row from others to zero out their columns
+        for (int j = 0; j < 4; j++) {
+            if (j != icol) {
+                float save = minv[j][icol];
+                minv[j][icol] = 0;
+                for (int k = 0; k < 4; k++) minv[j][k] -= minv[icol][k] * save;
+            }
+        }
+    }
+    // Swap columns to reflect permutation
+    for (int j = 3; j >= 0; j--) {
+        if (indxr[j] != indxc[j]) {
+            for (int k = 0; k < 4; k++)
+                std::swap(minv[k][indxr[j]], minv[k][indxc[j]]);
+        }
+    }
+    return Matrix4x4(minv);
+}
+
+// NOTE: this only exists to specify whether a Vector3f should be translated or
+// not when being transformed by a Transform.
+//     i.e. Vector3f v = ...;
+//          Transform t = ...;
+//          v = t * v;           <=>  t * vec4(v, 0)
+//          v = t * Point3f(v);  <=>  t * vec4(v, 1)
+template<typename T>
+struct Point3
+{
+    Vector3<T> v;
+    Point3<T>(const Vector3<T> &v) : v(v) {}
+};
+
+typedef Point3<float> Point3f;
+
+struct Transform
+{
+    Matrix4x4 m;
+    Matrix4x4 inv;
+
+    Transform() {}
+    Transform(const Matrix4x4 &m) : m(m), inv(::inverse(inv)) {}
+    Transform(const Matrix4x4 &m, const Matrix4x4 &inv) : m(m), inv(inv) {}
+
+    inline Transform inverse() const { return Transform(inv, m); }
+
+    template<typename T>
+    inline Vector3<T> operator*(const Vector3<T> &v) const
+    {
+        T x = v.x, y = v.y, z = v.z;
+        return Vector3<T>(m.m[0][0] * x + m.m[1][0] * y + m.m[2][0] * z,
+                          m.m[0][1] * x + m.m[1][1] * y + m.m[2][1] * z,
+                          m.m[0][2] * x + m.m[1][2] * y + m.m[2][2] * z);
+    }
+
+    template<typename T>
+    inline Vector3<T> operator*(const Point3<T> &p) const
+    {
+        // NOTE: assuming w = 1.
+        T x = p.v.x, y = p.v.y, z = p.v.z;
+        T xp = m.m[0][0] * x + m.m[1][0] * y + m.m[2][0] * z + m.m[3][0];
+        T yp = m.m[0][1] * x + m.m[1][1] * y + m.m[2][1] * z + m.m[3][1];
+        T zp = m.m[0][2] * x + m.m[1][2] * y + m.m[2][2] * z + m.m[3][2];
+        T wp = m.m[0][3] * x + m.m[1][3] * y + m.m[2][3] * z + m.m[3][3];
+        if (wp == 1)
+            return Vector3<T>(xp, yp, zp);
+        else
+            return Vector3<T>(xp, yp, zp) / wp;
+    }
+
+    inline Ray operator*(const Ray &r) const
+    {
+        // TODO: handle error
+        Vector3f o = (*this) * Point3f(r.o);
+        Vector3f d = (*this) * r.d;
+
+        return Ray(o, d, r.tmax, r.time);
+    }
+};
+
+static Transform translate(const Vector3f &delta)
+{
+    Matrix4x4 m(1, 0, 0, delta.x,
+                0, 1, 0, delta.y,
+                0, 0, 1, delta.z,
+                0, 0, 0, 1);
+
+    Matrix4x4 inv(1, 0, 0, -delta.x,
+                  0, 1, 0, -delta.y,
+                  0, 0, 1, -delta.z,
+                  0, 0, 0, 1);
+
+    return Transform(m, inv);
+}
 
 struct Pixel
 {
@@ -222,10 +398,10 @@ struct Intersection
 
 struct Sphere
 {
-    Sphere() : Sphere(Vector3f(), 0) {}
-    Sphere(Vector3f center, float radius) : center(center), radius(radius) {}
+    Sphere() : Sphere(Transform(), 0) {}
+    Sphere(const Transform &object_to_world, float radius) : object_to_world(object_to_world), radius(radius) {}
 
-    Vector3f center;
+    Transform object_to_world; // TODO: cache?
     float radius;
 };
 
@@ -236,16 +412,16 @@ struct Triangle
     int uvi[3];
 };
 
-struct Mesh
+struct MeshData
 {
     std::vector<Triangle> tris;
     std::vector<Vector3f> p;
     std::vector<Vector3f> n;
 };
 
-static Mesh load_obj(const std::string &path)
+static MeshData load_obj(const std::string &path)
 {
-    Mesh mesh;
+    MeshData mesh;
 
     std::ifstream file(path);
     if (!file)
@@ -306,6 +482,23 @@ static Mesh load_obj(const std::string &path)
     return mesh;
 }
 
+struct Mesh
+{
+    MeshData data;
+    Transform transform; // TODO: cache?
+};
+
+static Mesh create_mesh(const MeshData &data, const Vector3f &pos)
+{
+    Mesh mesh;
+    mesh.data = data;
+
+    for (Vector3f &p : mesh.data.p)
+        p += pos;
+
+    return mesh;
+}
+
 struct Scene
 {
     std::vector<Sphere> spheres;
@@ -316,20 +509,7 @@ struct Scene
         bool intersects = false;
         for (const Sphere &sphere : spheres)
         {
-            // TODO: replace with transform
-            Ray r = ray;
-            r.o += sphere.center;
-
-            // x^2 + y^2 + z^2 - r^2 = 0
-            // (ox + t*dx)^2 + (oy + t*dy)^2 + (oz + t*dz)^2 - r^2 = 0
-            // ox^2 + 2*ox*t*dx + t^2*dx^2 + oy^2 + 2*oy*t*dy + t^2*dy^2 + oz^2 + 2*oz*t*dz + t^2*dz^2 - r^2 = 0
-            // ox^2 + oy^2 + oz^2 - r^2 + 2*ox*t*dx + 2*oy*t*dy + 2*oz*t*dz + t^2*dx^2 + t^2*dy^2 + t^2*dz^2 = 0
-            // (ox^2 + oy^2 + oz^2 - r^2) + t*2*(ox*dx + oy*dy + oz*dz) + t^2*(dx^2 + dy^2 + dz^2) = 0
-            //
-            // a*t^2 + b*t + c = 0
-            // a = dx^2 + dy^2 + dz^2
-            // b = 2*(ox*dx + oy*dy + oz*dz)
-            // c = dx^2 + dy^2 + dz^2
+            Ray r = sphere.object_to_world.inverse() * ray;
             float dx = r.d.x;
             float dy = r.d.y;
             float dz = r.d.z;
@@ -359,7 +539,7 @@ struct Scene
             if ((hit.x == 0) && (hit.y == 0))
                 hit.x = 1e-5f * sphere.radius;
 
-            intersection->p = hit - sphere.center;
+            intersection->p = sphere.object_to_world * hit;
             intersection->n = normalize(intersection->p);
             
             // TODO: just do return (intersection->p != Vector3f()) or something?
@@ -368,8 +548,17 @@ struct Scene
 
         for (const Mesh &mesh : meshes)
         {
-            // TODO
-            UNUSED(mesh);
+            for (const Triangle &t : mesh.data.tris)
+            {
+                const Vector3f &p0 = mesh.data.p[t.pi[0]];
+                const Vector3f &p1 = mesh.data.p[t.pi[1]];
+                const Vector3f &p2 = mesh.data.p[t.pi[2]];
+
+                // TODO
+                UNUSED(p0);
+                UNUSED(p1);
+                UNUSED(p2);
+            }
         }
 
         return intersects;
@@ -396,7 +585,7 @@ static void render(const Scene &scene, const Camera &camera, Film &film)
         {
             CameraSample cs;
             cs.film_pos.x = (float)x / (float)(film.resolution.x - 1);
-            cs.film_pos.y = (float)y / (float)(film.resolution.y - 1);
+            cs.film_pos.y = 1 - (float)y / (float)(film.resolution.y - 1);
             cs.time = 0; // TODO
 
             Ray ray;
@@ -413,17 +602,12 @@ int main(int argc, char *argv[])
     UNUSED(argc);
     UNUSED(argv);
 
-    Mesh mesh = load_obj("icosphere.obj");
-    for (auto t : mesh.tris)
-    {
-        for (int i = 0; i < 3; ++i)
-            std::cout << t.pi[i] << "/" << t.ni[i] << "/" << t.uvi[i] << " ";
-        std::cout << "\n";
-    }
-
     Scene scene;
-    scene.spheres.push_back(Sphere(Vector3f(), 1));
-    scene.spheres.push_back(Sphere(Vector3f(0, -1000, 0), 1000));
+    scene.spheres.push_back(Sphere(translate(Vector3f(0, 0, 0)), 1));
+    scene.spheres.push_back(Sphere(translate(Vector3f(0, -1000, 0)), 1000));
+
+    MeshData mesh_data = load_obj("icosphere.obj");
+    scene.meshes.push_back(create_mesh(mesh_data, Vector3f(1, 0, 1)));
 
     Film film(Vector2i(300, 200));
     Camera camera(Vector3f(0, 0, 5), radians(60), &film);
