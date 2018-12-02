@@ -80,8 +80,8 @@ struct Vector3
     Vector3() : x(0), y(0), z(0) {}
     Vector3(T x, T y, T z) : x(x), y(y), z(z) {}
 
-    inline T operator[](int i) const { return *(&x + i); }
-    inline T &operator[](int i) { return *(&x + i); }
+    inline T operator[](int i) const { assert((i >= 0) && (i <= 2)); return *(&x + i); }
+    inline T &operator[](int i) { assert((i >= 0) && (i <= 2)); return *(&x + i); }
 
     inline Vector3<T> operator+(const Vector3<T> &v) const { return Vector3<T>(x + v.x, y + v.y, z + v.z); }
     inline Vector3<T> operator-(const Vector3<T> &v) const { return Vector3<T>(x - v.x, y - v.y, z - v.z); }
