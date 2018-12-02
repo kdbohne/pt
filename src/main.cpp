@@ -103,6 +103,12 @@ template<typename T>
 inline Vector3<T> normalize(const Vector3<T> &v) { return v / v.length(); }
 
 template<typename T>
+inline Vector3<T> abs(const Vector3<T> &v)
+{
+    return Vector3<T>(std::abs(v.x), std::abs(v.y), std::abs(v.z));
+}
+
+template<typename T>
 inline float dot(const Vector3<T> &a, const Vector3<T> &b)
 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
@@ -116,6 +122,18 @@ inline Vector3<T> cross(const Vector3<T> &a, const Vector3<T> &b)
     return Vector3<T>((ay * bz) - (az * by),
                       (az * bx) - (ax * bz),
                       (ax * by) - (ay * bx));
+}
+
+template<typename T>
+inline int max_dimension(const Vector3<T> &v)
+{
+    return (v.x > v.y) ? ((v.x > v.z) ? 0 : 2) : ((v.y > v.z) ? 1 : 2);
+}
+
+template<typename T>
+inline Vector3<T> permute(const Vector3<T> &v, int x, int y, int z)
+{
+    return Vector3<T>(v[x], v[y], v[z]);
 }
 
 typedef Vector2<float> Vector2f;
