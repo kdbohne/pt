@@ -9,6 +9,27 @@
 
 #define UNUSED(x) ((void)(x))
 
+void report_(const char *prefix, bool fatal, const char *format, ...) __attribute__((__format__(__printf__, 3, 4)));
+void report_(const char *prefix, bool fatal, const char *format, ...)
+{
+    std::printf("[%s] ", prefix);
+
+    va_list args;
+    va_start(args, format);
+    std::vprintf(format, args); // TODO LOG
+    va_end(args);
+
+    std::printf("\n");
+
+    if (fatal)
+        __builtin_trap();
+}
+
+#define error(format, ...) report_("ERROR", false, format, __VA_ARGS__)
+#define fatal(format, ...) report_("FATAL", true, format, __VA_ARGS__)
+#define assert(expr) \
+    ((expr) ? (void)0 : fatal("(%s:%d) Assertion failed: %s", __FILE__, __LINE__, #expr))
+
 #undef INFINITY
 static constexpr float INFINITY = std::numeric_limits<float>::infinity();
 static constexpr float PI = 3.14159265358979323846;
