@@ -480,18 +480,22 @@ static MeshData load_obj(const std::string &path)
             Triangle t;
             for (int i = 0; i < 3; ++i)
             {
-                ss >> t.pi[i];
+                int pi, ni = 0, uvi = 0;
+                ss >> pi;
                 if (ss.peek() == '/')
                 {
                     ss.get();
                     if (ss.peek() != '/')
-                        ss >> t.uvi[i];
-                    else
-                        t.uvi[i] = -1;
+                        ss >> uvi;
 
                     ss.get();
-                    ss >> t.ni[i];
+                    ss >> ni;
                 }
+
+                // OBJ indexing starts at 1.
+                t.pi[i] = pi - 1;
+                t.ni[i] = ni - 1;
+                t.uvi[i] = uvi - 1;
             }
             mesh.tris.push_back(t);
         }
