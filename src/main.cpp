@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <memory>
 #include <string>
@@ -228,9 +229,87 @@ struct Sphere
     float radius;
 };
 
+struct Triangle
+{
+    int pi[3];
+    int ni[3];
+    int uvi[3];
+};
+
+struct Mesh
+{
+    std::vector<Triangle> tris;
+    std::vector<Vector3f> p;
+    std::vector<Vector3f> n;
+};
+
+static Mesh load_obj(const std::string &path)
+{
+    Mesh mesh;
+
+    std::ifstream file(path);
+    if (!file)
+        error("Failed to load OBJ file: %s", path.c_str());
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line[0] == 'v')
+        {
+            if (line[1] == ' ')
+            {
+                // Position
+                std::istringstream ss(line.substr(2));
+
+                Vector3f p;
+                ss >> p.x >> p.y >> p.z;
+                mesh.p.push_back(p);
+            }
+            else if (line[1] == 'n')
+            {
+                std::istringstream ss(line.substr(3));
+
+                Vector3f n;
+                ss >> n.x >> n.y >> n.z;
+                mesh.n.push_back(n);
+            }
+            else
+            {
+                // TODO: texture coordinates
+                assert(false);
+            }
+        }
+        else if (line[0] == 'f')
+        {
+            std::istringstream ss(line.substr(2));
+
+            Triangle t;
+            for (int i = 0; i < 3; ++i)
+            {
+                ss >> t.pi[i];
+                if (ss.peek() == '/')
+                {
+                    ss.get();
+                    if (ss.peek() != '/')
+                        ss >> t.uvi[i];
+                    else
+                        t.uvi[i] = -1;
+
+                    ss.get();
+                    ss >> t.ni[i];
+                }
+            }
+            mesh.tris.push_back(t);
+        }
+    }
+
+    return mesh;
+}
+
 struct Scene
 {
     std::vector<Sphere> spheres;
+    std::vector<Mesh> meshes;
 
     bool intersect(const Ray &ray, Intersection *intersection) const
     {
@@ -287,6 +366,12 @@ struct Scene
             intersects = true;
         }
 
+        for (const Mesh &mesh : meshes)
+        {
+            // TODO
+            UNUSED(mesh);
+        }
+
         return intersects;
     }
 };
@@ -327,6 +412,14 @@ int main(int argc, char *argv[])
 {
     UNUSED(argc);
     UNUSED(argv);
+
+    Mesh mesh = load_obj("icosphere.obj");
+    for (auto t : mesh.tris)
+    {
+        for (int i = 0; i < 3; ++i)
+            std::cout << t.pi[i] << "/" << t.ni[i] << "/" << t.uvi[i] << " ";
+        std::cout << "\n";
+    }
 
     Scene scene;
     scene.spheres.push_back(Sphere(Vector3f(), 1));
