@@ -650,12 +650,23 @@ struct Scene
                 float b2 = e2 * inv_det;
                 float t = t_scaled * inv_det;
 
-                Vector3f hit = b0 * p0 + b1 * p1 + b2 *p2;
+                Vector3f hit = b0 * p0 + b1 * p1 + b2 * p2;
 
-                const Vector3f &n0 = mesh.data.n[tri.ni[0]];
-                const Vector3f &n1 = mesh.data.n[tri.ni[1]];
-                const Vector3f &n2 = mesh.data.n[tri.ni[2]];
-                Vector3f n = b0 * n0 + b1 * n1 + b2 * n2;
+                Vector3f n;
+                if ((tri.ni[0] == -1) || (tri.ni[1] == -1) || (tri.ni[2] == -1))
+                {
+                    // TODO: precompute, store in MeshData?
+                    Vector3f dp02 = p0 - p2;
+                    Vector3f dp12 = p1 - p2;
+                    n = normalize(cross(dp02, dp12));
+                }
+                else
+                {
+                    const Vector3f &n0 = mesh.data.n[tri.ni[0]];
+                    const Vector3f &n1 = mesh.data.n[tri.ni[1]];
+                    const Vector3f &n2 = mesh.data.n[tri.ni[2]];
+                    n = b0 * n0 + b1 * n1 + b2 * n2;
+                }
 
                 intersection->p = hit;
                 intersection->n = n;
