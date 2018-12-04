@@ -193,10 +193,34 @@ struct Matrix4x4
     }
 
     Matrix4x4(float mat[4][4]) { std::memcpy(m, mat, sizeof(float) * 16); }
+
+    inline Matrix4x4 operator*(const Matrix4x4 &mat) const
+    {
+        Matrix4x4 r;
+        for (int i = 0; i < 4; ++i)
+        {
+            for (int j = 0; j < 4; ++j)
+            {
+                r.m[i][j] = m[0][j] * mat.m[i][0] +
+                            m[1][j] * mat.m[i][1] +
+                            m[2][j] * mat.m[i][2] +
+                            m[3][j] * mat.m[i][3];
+            }
+        }
+        return r;
+    }
 };
 
+static Matrix4x4 transpose(const Matrix4x4 &m)
+{
+    return Matrix4x4(m.m[0][0], m.m[0][1], m.m[0][2], m.m[0][3],
+                     m.m[1][0], m.m[1][1], m.m[1][2], m.m[1][3],
+                     m.m[2][0], m.m[2][1], m.m[2][2], m.m[2][3],
+                     m.m[3][0], m.m[3][1], m.m[3][2], m.m[3][3]);
+}
+
 // NOTE: this is Inverse() from pbrt-v3.
-Matrix4x4 inverse(const Matrix4x4 &m)
+static Matrix4x4 inverse(const Matrix4x4 &m)
 {
     int indxc[4], indxr[4];
     int ipiv[4] = {0, 0, 0, 0};
@@ -274,10 +298,13 @@ struct Transform
     Matrix4x4 inv;
 
     Transform() {}
-    Transform(const Matrix4x4 &m) : m(m), inv(::inverse(inv)) {}
+    Transform(const Matrix4x4 &m) : m(m), inv(inverse(m)) {}
     Transform(const Matrix4x4 &m, const Matrix4x4 &inv) : m(m), inv(inv) {}
 
-    inline Transform inverse() const { return Transform(inv, m); }
+    inline Transform operator*(const Transform &t) const
+    {
+        return Transform(m * t.m, t.inv * inv);
+    }
 
     template<typename T>
     inline Vector3<T> operator*(const Vector3<T> &v) const
@@ -313,6 +340,11 @@ struct Transform
     }
 };
 
+inline Transform inverse(const Transform &t)
+{
+    return Transform(t.inv, t.m);
+}
+
 static Transform translate(const Vector3f &delta)
 {
     Matrix4x4 m(1, 0, 0, delta.x,
@@ -326,6 +358,64 @@ static Transform translate(const Vector3f &delta)
                   0, 0, 0, 1);
 
     return Transform(m, inv);
+}
+
+static Transform scale(float x, float y, float z)
+{
+    Matrix4x4 m(x, 0, 0, 0,
+                0, y, 0, 0,
+                0, 0, z, 0,
+                0, 0, 0, 1);
+
+    Matrix4x4 inv(1 / x,     0,     0, 0,
+                      0, 1 / y,     0, 0,
+                      0,     0, 1 / z, 0,
+                      0,     0,     0, 1);
+
+    return Transform(m, inv);
+}
+
+static Transform perspective(float vfov, float aspect, float n, float f)
+{
+    Matrix4x4 persp(1, 0,           0,                0,
+                    0, 1,           0,                0,
+                    0, 0, f / (f - n), -f * n / (f - n),
+                    0, 0,           1,                0);
+
+    float inv_tan = 1 / std::tan(vfov / 2);
+
+    return scale(inv_tan / aspect, inv_tan, 1) * Transform(persp);
+}
+
+static Transform look_at(const Vector3f &eye, const Vector3f &target, const Vector3f &up)
+{
+    Vector3f forward = normalize(target - eye);
+    Vector3f right = normalize(cross(forward, up));
+    Vector3f local_up = normalize(cross(right, forward));
+
+    Matrix4x4 camera_to_world;
+
+    camera_to_world.m[0][0] = right.x;
+    camera_to_world.m[0][1] = right.y;
+    camera_to_world.m[0][2] = right.z;
+    camera_to_world.m[0][3] = 0;
+
+    camera_to_world.m[1][0] = local_up.x;
+    camera_to_world.m[1][1] = local_up.y;
+    camera_to_world.m[1][2] = local_up.z;
+    camera_to_world.m[1][3] = 0;
+
+    camera_to_world.m[2][0] = forward.x;
+    camera_to_world.m[2][1] = forward.y;
+    camera_to_world.m[2][2] = forward.z;
+    camera_to_world.m[2][3] = 0;
+
+    camera_to_world.m[3][0] = eye.x;
+    camera_to_world.m[3][1] = eye.y;
+    camera_to_world.m[3][2] = eye.z;
+    camera_to_world.m[3][3] = 1;
+
+    return camera_to_world;
 }
 
 struct Pixel
@@ -375,34 +465,27 @@ struct CameraSample
 
 struct Camera
 {
-    Vector3f pos;
-    float vfov;
+    Transform camera_to_world;
+    Transform camera_to_screen;
 
     Film *film;
 
-    float half_height;
-    float half_width;
-
-    Camera(Vector3f pos, float vfov, Film *film) : pos(pos), vfov(vfov)
+    Camera(const Transform &camera_to_world, float vfov, Film *film)
+        : camera_to_world(camera_to_world),
+          camera_to_screen(perspective(vfov, (float)film->resolution.x / (float)film->resolution.y, 1e-2f, 1000.0f)),
+          film(film)
     {
-        float aspect_ratio = (float)film->resolution.x / (float)film->resolution.y;
-        half_height = std::tan(vfov / 2);
-        half_width = half_height * aspect_ratio;
     }
 
     float generate_ray(const CameraSample &sample, Ray *ray) const
     {
-        Vector3f forward(0, 0, -1);
-        Vector3f right = normalize(cross(forward, Vector3f(0, 1, 0)));
-        Vector3f up = normalize(cross(right, forward));
+        Vector3f screen_pos(sample.film_pos.x * 2 - 1, sample.film_pos.y * 2 - 1, 0);
+        screen_pos = inverse(camera_to_screen) * screen_pos;
+        screen_pos.z = 1;
 
-        float nx = 2 * sample.film_pos.x - 1;
-        float ny = 2 * sample.film_pos.y - 1;
-        ray->o = pos;
-        ray->d = normalize(forward + (right * nx * half_width) + (up * ny * half_height));
-
-        ray->tmax = INFINITY;
-        ray->time = sample.time;
+        // TODO: lerp time between shutter open/close
+        *ray = Ray(Vector3f(), normalize(screen_pos), INFINITY, sample.time);
+        *ray = camera_to_world * (*ray);
 
         return 1;
     }
@@ -534,7 +617,7 @@ struct Scene
 
         for (const Sphere &sphere : spheres)
         {
-            Ray r = sphere.object_to_world.inverse() * ray;
+            Ray r = inverse(sphere.object_to_world) * ray;
             float dx = r.d.x;
             float dy = r.d.y;
             float dz = r.d.z;
@@ -566,7 +649,7 @@ struct Scene
             intersection->n = normalize(intersection->p);
 
             ray.tmax = t;
-            
+
             intersects = true;
         }
 
@@ -719,14 +802,19 @@ int main(int argc, char *argv[])
     UNUSED(argv);
 
     Scene scene;
-    scene.spheres.push_back(Sphere(translate(Vector3f(0, 0, 0)), 1));
-    scene.spheres.push_back(Sphere(translate(Vector3f(0, -1000, 0)), 1000));
+    scene.spheres.push_back(Sphere(translate(Vector3f(10, 10, 4)), 0.5));
+    scene.spheres.push_back(Sphere(translate(Vector3f(-1.25, 0, 0)), 0.1));
+    scene.spheres.push_back(Sphere(translate(Vector3f(-3.75, 0, 0)), 0.03333));
+    scene.spheres.push_back(Sphere(translate(Vector3f( 1.25, 0, 0)), 0.3));
+    scene.spheres.push_back(Sphere(translate(Vector3f( 3.75, 0, 0)), 0.9));
+    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/floor.obj")));
+    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate1.obj")));
+    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate2.obj")));
+    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate3.obj")));
+    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate4.obj")));
 
-    MeshData mesh_data = load_obj("icosphere.obj");
-    scene.meshes.push_back(create_mesh(translate(Vector3f(1, 0, 1)), mesh_data));
-
-    Film film(Vector2i(300, 200));
-    Camera camera(Vector3f(0, 0, 5), radians(60), &film);
+    Film film(Vector2i(768, 512));
+    Camera camera(look_at(Vector3f(0, 2, 15), Vector3f(0, -2, 2.5), Vector3f(0, 1, 0)), radians(28), &film);
 
     render(scene, camera, film);
     film.write_ppm("out.ppm");
