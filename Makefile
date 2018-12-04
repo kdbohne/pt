@@ -1,6 +1,7 @@
 CXX = clang++
 CXXFLAGS += -std=c++17 -O0 -g
 CXXFLAGS += -Werror -Wall -Wextra -Wshadow -Wpedantic
+CXXFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable # TODO: disable for production builds
 
 OBJECTS := main.o
 OBJECTS := $(addprefix build/, $(OBJECTS))
