@@ -634,15 +634,37 @@ struct Intersection
 {
     Vector3f p;
     Vector3f n;
+    Vector3f wo;
+
     float time;
 
     const Entity *entity;
+
+    Intersection() {}
+    Intersection(const Vector3f &p, const Vector3f &n, const Vector3f &wo, float time)
+        : p(p), n(n), wo(wo), time(time), entity(nullptr)
+    {
+    }
 
     Ray spawn_ray(const Vector3f &d) const
     {
         return Ray(p, d, INFINITY, time);
     }
 };
+
+// TODO: make member of Transform
+inline Intersection operator*(const Transform &t, const Intersection &in)
+{
+    Intersection result;
+    // TODO: handle error
+    result.p = t * Point3f(in.p);
+    result.n = t * in.n;
+    result.wo = t * in.wo;
+    result.time = in.time;
+    result.entity = in.entity;
+
+    return result;
+}
 
 static Vector3f uniform_sample_sphere(const Vector2f &u)
 {
@@ -691,6 +713,12 @@ struct Light
     float emittance;
 
     Light(float emittance) : emittance(emittance) {}
+
+    // TODO: return spectrum
+    Vector3f radiance(const Intersection &intersection, const Vector3f &w) const
+    {
+        return (dot(intersection.n, w) > 0) ? emittance : Vector3f(0);
+    }
 };
 
 struct Entity
@@ -710,15 +738,8 @@ struct Entity
     }
 
     // TODO: return spectrum
-    Vector3f radiance(const Intersection &intersection, const Vector3f &w) const
-    {
-        assert(light);
-        return (dot(intersection.n, w) > 0) ? light->emittance : Vector3f(0);
-    }
-
-    // TODO: return spectrum
     // TODO: visibility tester
-    Vector3f sample_light(const Intersection &ref, const Vector2f &u,
+    Vector3f sample(const Intersection &ref, const Vector2f &u,
                           Vector3f *wi, float *pdf) const
     {
         assert(light);
@@ -727,7 +748,7 @@ struct Entity
         *wi = normalize(intersection.p - ref.p);
         *pdf = geometry->pdf(ref, *wi);
         // TODO: visibility tester
-        return radiance(intersection, -(*wi));
+        return light->radiance(intersection, -(*wi));
     }
 };
 
@@ -770,8 +791,7 @@ struct Sphere : public Geometry
         if ((hit.x == 0) && (hit.y == 0))
             hit.x = 1e-5f * radius;
 
-        intersection->p = object_to_world * hit;
-        intersection->n = normalize(intersection->p);
+        *intersection = object_to_world * Intersection(hit, normalize(hit), -r.d, r.time);
 
         ray.tmax = *t;
 
@@ -1022,7 +1042,14 @@ static Vector3f incident_radiance(const Scene &scene, const Ray &ray)
         return Vector3f(0, 0, 0);
     }
 
-    return intersection.n * 0.5 + Vector3f(0.5, 0.5, 0.5);
+    Vector3f radiance;
+
+    const std::shared_ptr<Light> &light = intersection.entity->light;
+    if (light)
+        radiance += light->radiance(intersection, intersection.wo);
+
+    return radiance;
+//    return intersection.n * 0.5 + Vector3f(0.5, 0.5, 0.5);
 }
 
 static void render(const Scene &scene, const Camera &camera, Film &film)
