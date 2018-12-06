@@ -71,6 +71,9 @@ struct Vector2
     Vector2() : x(0), y(0) {}
     Vector2(T x, T y) : x(x), y(y) {}
 
+    inline T operator[](int i) const { assert((i >= 0) && (i <= 1)); return *(&x + i); }
+    inline T &operator[](int i) { assert((i >= 0) && (i <= 1)); return *(&x + i); }
+
     T x, y;
 };
 
