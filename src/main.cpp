@@ -93,6 +93,7 @@ struct Vector3
     inline Vector3<T> &operator-=(const Vector3<T> &v) { x -= v.x; y -= v.y; z -= v.z; return *this; }
     inline Vector3<T> operator*(T s) const { return Vector3<T>(x * s, y * s, z * s); }
     inline Vector3<T> operator/(T s) const { return Vector3<T>(x / s, y / s, z / s); }
+    inline Vector3<T> operator-() const { return Vector3<T>(-x, -y, -z); }
 
     inline float length_squared() const { return (x * x) + (y * y) + (z * z); }
     inline float length() const { return std::sqrt(length_squared()); }
