@@ -534,22 +534,7 @@ struct Camera
     }
 };
 
-struct Intersection
-{
-    Vector3f p;
-    Vector3f n;
-};
-
-struct Sphere
-{
-    Sphere() : Sphere(Transform(), 0) {}
-    Sphere(const Transform &object_to_world, float radius) : object_to_world(object_to_world), radius(radius) {}
-
-    Transform object_to_world; // TODO: cache?
-    float radius;
-};
-
-struct Triangle
+struct TriangleData
 {
     int pi[3];
     int ni[3];
@@ -558,7 +543,7 @@ struct Triangle
 
 struct MeshData
 {
-    std::vector<Triangle> tris;
+    std::vector<TriangleData> tris;
     std::vector<Vector3f> p;
     std::vector<Vector3f> n;
 };
@@ -603,7 +588,7 @@ static MeshData load_obj(const std::string &path)
         {
             std::istringstream ss(line.substr(2));
 
-            Triangle t;
+            TriangleData t;
             for (int i = 0; i < 3; ++i)
             {
                 int pi, ni = 0, uvi = 0;
@@ -633,180 +618,401 @@ static MeshData load_obj(const std::string &path)
 struct Mesh
 {
     MeshData data;
-//    Transform transform; // TODO: cache?
+
+    Mesh(const Transform &transform, const MeshData &data) : data(data)
+    {
+        for (Vector3f &p : this->data.p)
+            p = transform * Point3f(p);
+        for (Vector3f &n : this->data.n)
+            n = transform * n;
+    }
 };
 
-static Mesh create_mesh(const Transform &transform, const MeshData &data)
+struct Entity;
+
+struct Intersection
 {
-    Mesh mesh;
-    mesh.data = data;
+    Vector3f p;
+    Vector3f n;
+    float time;
 
-    for (Vector3f &p : mesh.data.p)
-        p = transform * Point3f(p);
-    for (Vector3f &n : mesh.data.n)
-        n = transform * n;
+    const Entity *entity;
 
-    return mesh;
+    Ray spawn_ray(const Vector3f &d) const
+    {
+        return Ray(p, d, INFINITY, time);
+    }
+};
+
+static Vector3f uniform_sample_sphere(const Vector2f &u)
+{
+    float z = 1 - 2 * u[0];
+    float r = std::sqrt(std::max((float)0, (float)1 - z * z));
+    float phi = 2 * PI * u[1];
+    return Vector3f(r * std::cos(phi), r * std::sin(phi), z);
 }
+
+static float uniform_cone_pdf(float cos_theta_max)
+{
+    return 1 / (2 * PI * (1 - cos_theta_max));
+}
+
+struct Geometry
+{
+    Transform object_to_world; // TODO: cache?
+
+    Geometry(const Transform &object_to_world) : object_to_world(object_to_world) {}
+    virtual ~Geometry() {}
+
+    virtual bool intersect(const Ray &ray, float *t, Intersection *intersection) const = 0;
+
+    virtual Intersection sample(const Vector2f &u) const = 0;
+    virtual Intersection sample(const Intersection &ref, const Vector2f &u) const = 0;
+
+    virtual float area() const = 0;
+    virtual float pdf(const Intersection &ref, const Vector3f &wi) const;
+};
+
+float Geometry::pdf(const Intersection &ref, const Vector3f &wi) const
+{
+    Ray ray = ref.spawn_ray(wi);
+
+    float t;
+    Intersection light_intersection;
+    if (intersect(ray, &t, &light_intersection))
+        return 0;
+
+    float pdf = distance_squared(ref.p, light_intersection.p) / (abs_dot(light_intersection.n, -wi) * area());
+    return pdf;
+}
+
+struct Light
+{
+    float emittance;
+
+    Light(float emittance) : emittance(emittance) {}
+};
+
+struct Entity
+{
+    std::shared_ptr<Geometry> geometry;
+    std::shared_ptr<Light> light;
+
+    Entity(const std::shared_ptr<Geometry> &geometry, const std::shared_ptr<Light> &light) : geometry(geometry), light(light) {}
+
+    bool intersect(const Ray &ray, float *t, Intersection *intersection) const
+    {
+        if (!geometry->intersect(ray, t, intersection))
+            return false;
+
+        intersection->entity = this;
+        return true;
+    }
+
+    // TODO: return spectrum
+    Vector3f radiance(const Intersection &intersection, const Vector3f &w) const
+    {
+        assert(light);
+        return (dot(intersection.n, w) > 0) ? light->emittance : Vector3f(0);
+    }
+
+    // TODO: return spectrum
+    // TODO: visibility tester
+    Vector3f sample_light(const Intersection &ref, const Vector2f &u,
+                          Vector3f *wi, float *pdf) const
+    {
+        assert(light);
+
+        Intersection intersection = geometry->sample(ref, u);
+        *wi = normalize(intersection.p - ref.p);
+        *pdf = geometry->pdf(ref, *wi);
+        // TODO: visibility tester
+        return radiance(intersection, -(*wi));
+    }
+};
+
+struct Sphere : public Geometry
+{
+    float radius;
+
+    Sphere() : Sphere(Transform(), 0) {}
+    Sphere(const Transform &object_to_world, float radius) : Geometry(object_to_world), radius(radius) {}
+
+    float area() const override { return 4 * PI * (radius * radius); }
+
+    bool intersect(const Ray &ray, float *t, Intersection *intersection) const override
+    {
+        Ray r = inverse(object_to_world) * ray;
+        float dx = r.d.x;
+        float dy = r.d.y;
+        float dz = r.d.z;
+        float ox = r.o.x;
+        float oy = r.o.y;
+        float oz = r.o.z;
+
+        float a = (dx * dx) + (dy * dy) + (dz * dz);
+        float b = 2 * ((ox * dx) + (oy * dy) + (oz * dz));
+        float c = (ox * ox) + (oy * oy) + (oz * oz) - (radius * radius);
+
+        float t0, t1;
+        if (!quadratic(a, b, c, &t0, &t1))
+            return false;
+
+        if ((t0 > r.tmax) || (t1 <= 0))
+            return false;
+
+        *t = (t0 > 0) ? t0 : t1;
+        if (*t > r.tmax)
+            return false;
+
+        Vector3f hit = r.evaluate(*t);
+        // TODO: refine hit point
+        if ((hit.x == 0) && (hit.y == 0))
+            hit.x = 1e-5f * radius;
+
+        intersection->p = object_to_world * hit;
+        intersection->n = normalize(intersection->p);
+
+        ray.tmax = *t;
+
+        return true;
+    }
+
+    Intersection sample(const Vector2f &u) const override
+    {
+        Vector3f obj = Vector3f(0, 0, 0) + radius * uniform_sample_sphere(u);
+
+        Intersection i;
+        i.n = normalize(object_to_world * obj);
+        // TODO: reproject
+        i.p = object_to_world * Point3f(obj);
+
+        return i;
+    }
+
+    Intersection sample(const Intersection &ref, const Vector2f &u) const override
+    {
+        Vector3f center = object_to_world * Point3f(Vector3f(0, 0, 0));
+        Vector3f wc = normalize(center - ref.p);
+        Vector3f wcx, wcy;
+        coordinate_system(wc, &wcx, &wcy);
+
+        // TODO: offset_ray_origin()
+        Vector3f origin = ref.p;
+        if (distance_squared(origin, center) <= radius * radius)
+            return sample(u);
+
+        float sin_theta_max2 = radius * radius / distance_squared(ref.p, center);
+        float cos_theta_max = std::sqrt(std::max((float)0, 1 - sin_theta_max2));
+        float cos_theta = (1 - u[0]) + u[0] * cos_theta_max;
+        float sin_theta = std::sqrt(std::max((float)0, 1 - cos_theta * cos_theta));
+        float phi = u[1] * 2 * PI;
+
+        float dc = distance(ref.p, center);
+        float ds = dc * cos_theta - std::sqrt(std::max((float)0, radius * radius - dc * dc * sin_theta * sin_theta));
+        float cos_alpha = (dc * dc + radius * radius - ds * ds) / (2 * dc * radius);
+        float sin_alpha = std::sqrt(std::max((float)0, 1 - cos_alpha * cos_alpha));
+
+        Vector3f n_obj = spherical_direction(sin_alpha, cos_alpha, phi, -wcx, -wcy, -wc);
+        Vector3f p_obj = radius * n_obj;
+
+        Intersection i;
+        // TODO: reproject
+        i.p = object_to_world * Point3f(p_obj);
+        i.n = object_to_world * n_obj;
+
+        return i;
+    }
+
+    float pdf(const Intersection &ref, const Vector3f &wi) const override
+    {
+        Vector3f center = object_to_world * Point3f(Vector3f(0, 0, 0));
+        // TODO: offset_ray_origin()
+        Vector3f origin = ref.p;
+        if (distance_squared(origin, center) <= radius * radius)
+            return Geometry::pdf(ref, wi);
+
+        float sin_theta_max2 = radius * radius / distance_squared(ref.p, center);
+        float cos_theta_max = std::sqrt(std::max((float)0, 1 - sin_theta_max2));
+        return uniform_cone_pdf(cos_theta_max);
+    }
+};
+
+struct Triangle : public Geometry
+{
+    Triangle(const std::shared_ptr<Mesh> &mesh, const TriangleData &data) : Geometry(Transform()), mesh(mesh)
+    {
+        pi[0] = data.pi[0];
+        pi[1] = data.pi[1];
+        pi[2] = data.pi[2];
+
+        // TODO FIXME
+        ni[0] = data.ni[0];
+        ni[1] = data.ni[1];
+        ni[2] = data.ni[2];
+    }
+
+    std::shared_ptr<Mesh> mesh;
+    // TODO: reduce memory usage here
+    int pi[3];
+    int ni[3];
+
+    bool intersect(const Ray &ray, float *t, Intersection *intersection) const override
+    {
+        const Vector3f &p0 = mesh->data.p[pi[0]];
+        const Vector3f &p1 = mesh->data.p[pi[1]];
+        const Vector3f &p2 = mesh->data.p[pi[2]];
+
+        // Translate the triangle to the local ray coordinate system.
+        Vector3f p0t = p0 - ray.o;
+        Vector3f p1t = p1 - ray.o;
+        Vector3f p2t = p2 - ray.o;
+
+        // Determine which axis is largest, then permute the ray and
+        // the triangle vertices so that this axis is now the z-axis.
+        int kz = max_dimension(abs(ray.d));
+        int kx = (kz + 1) % 3; // TODO: % vs if?
+        int ky = (kx + 1) % 3; // TODO: % vs if?
+
+        Vector3f d = permute(ray.d, kx, ky, kz);
+        p0t = permute(p0t, kx, ky, kz);
+        p1t = permute(p1t, kx, ky, kz);
+        p2t = permute(p2t, kx, ky, kz);
+
+        // Apply a shear transformation to the vertices to align them
+        // with the ray facing in the +z direction.
+        // NOTE: only applying x/y here; z is not needed for the next
+        // two intersection tests.
+        // TODO: precompute coefficients (sx, sy, sz), store in Ray
+        float sx = -d.x / d.z;
+        float sy = -d.y / d.z;
+        float sz = 1.0f / d.z;
+        p0t.x += sx * p0t.z;
+        p0t.y += sy * p0t.z;
+        p1t.x += sx * p1t.z;
+        p1t.y += sy * p1t.z;
+        p2t.x += sx * p2t.z;
+        p2t.y += sy * p2t.z;
+
+        // Signed edge function values.
+        float e0 = p1t.x * p2t.y - p1t.y * p2t.x;
+        float e1 = p2t.x * p0t.y - p2t.y * p0t.x;
+        float e2 = p0t.x * p1t.y - p0t.y * p1t.x;
+
+        // Fall back to double precision when testing triangle edges.
+        if ((e0 == 0) || (e1 == 0) || (e2 == 0))
+        {
+            e0 = (float)((double)p1t.x * (double)p2t.y - (double)p1t.y * (double)p2t.x);
+            e1 = (float)((double)p2t.x * (double)p0t.y - (double)p2t.y * (double)p0t.x);
+            e2 = (float)((double)p0t.x * (double)p1t.y - (double)p0t.y * (double)p1t.x);
+        }
+
+        // Test triangle edges for containment.
+        if (((e0 < 0) || (e1 < 0) || (e2 < 0)) && ((e0 > 0) || (e1 > 0) || (e2 > 0)))
+            return false;
+
+        // Ray is approaching edge-on.
+        float det = e0 + e1 + e2;
+        if (det == 0)
+            return false;
+
+        // Apply the z-component of the shear transformation now.
+        p0t.z *= sz;
+        p1t.z *= sz;
+        p2t.z *= sz;
+
+        // Scaled hit distance and corresponding range tests.
+        float t_scaled = e0 * p0t.z + e1 * p1t.z + e2 * p2t.z;
+        if ((det < 0) && ((t_scaled >= 0) || (t_scaled < ray.tmax * det)))
+            return false;
+        if ((det > 0) && ((t_scaled <= 0) || (t_scaled > ray.tmax * det)))
+            return false;
+
+        // Compute barycentric coordinates.
+        float inv_det = 1 / det;
+        float b0 = e0 * inv_det;
+        float b1 = e1 * inv_det;
+        float b2 = e2 * inv_det;
+        *t = t_scaled * inv_det;
+
+        Vector3f hit = b0 * p0 + b1 * p1 + b2 * p2;
+
+        Vector3f n;
+        if ((ni[0] == -1) || (ni[1] == -1) || (ni[2] == -1))
+        {
+            // TODO: precompute, store in MeshData?
+            Vector3f dp02 = p0 - p2;
+            Vector3f dp12 = p1 - p2;
+            n = normalize(cross(dp02, dp12));
+        }
+        else
+        {
+            const Vector3f &n0 = mesh->data.n[ni[0]];
+            const Vector3f &n1 = mesh->data.n[ni[1]];
+            const Vector3f &n2 = mesh->data.n[ni[2]];
+            n = b0 * n0 + b1 * n1 + b2 * n2;
+        }
+
+        intersection->p = hit;
+        intersection->n = n;
+
+        ray.tmax = *t;
+
+        return true;
+    }
+
+    Intersection sample(const Vector2f &u) const override
+    {
+        // TODO FIXME
+        return Intersection();
+    }
+
+    Intersection sample(const Intersection &ref, const Vector2f &u) const override
+    {
+        // TODO FIXME
+        return Intersection();
+    }
+
+    float area() const override
+    {
+        // TODO FIXME
+        return 0;
+    }
+
+    float pdf(const Intersection &ref, const Vector3f &wi) const override
+    {
+        // TODO FIXME
+        return 0;
+    }
+};
 
 struct Scene
 {
-    std::vector<Sphere> spheres;
-    std::vector<Mesh> meshes;
+    std::vector<Entity> entities;
 
     bool intersect(const Ray &ray, Intersection *intersection) const
     {
         bool intersects = false;
 
-        for (const Sphere &sphere : spheres)
+        for (const Entity &entity : entities)
         {
-            Ray r = inverse(sphere.object_to_world) * ray;
-            float dx = r.d.x;
-            float dy = r.d.y;
-            float dz = r.d.z;
-            float ox = r.o.x;
-            float oy = r.o.y;
-            float oz = r.o.z;
-
-            float a = (dx * dx) + (dy * dy) + (dz * dz);
-            float b = 2 * ((ox * dx) + (oy * dy) + (oz * dz));
-            float c = (ox * ox) + (oy * oy) + (oz * oz) - (sphere.radius * sphere.radius);
-
-            float t0, t1;
-            if (!quadratic(a, b, c, &t0, &t1))
-                continue;
-
-            if ((t0 > r.tmax) || (t1 <= 0))
-                continue;
-
-            float t = (t0 > 0) ? t0 : t1;
-            if (t > r.tmax)
-                continue;
-
-            Vector3f hit = r.evaluate(t);
-            // TODO: refine hit point
-            if ((hit.x == 0) && (hit.y == 0))
-                hit.x = 1e-5f * sphere.radius;
-
-            intersection->p = sphere.object_to_world * hit;
-            intersection->n = normalize(intersection->p);
-
-            ray.tmax = t;
-
-            intersects = true;
-        }
-
-        for (const Mesh &mesh : meshes)
-        {
-            for (const Triangle &tri : mesh.data.tris)
-            {
-                const Vector3f &p0 = mesh.data.p[tri.pi[0]];
-                const Vector3f &p1 = mesh.data.p[tri.pi[1]];
-                const Vector3f &p2 = mesh.data.p[tri.pi[2]];
-
-                // Translate the triangle to the local ray coordinate system.
-                Vector3f p0t = p0 - ray.o;
-                Vector3f p1t = p1 - ray.o;
-                Vector3f p2t = p2 - ray.o;
-
-                // Determine which axis is largest, then permute the ray and
-                // the triangle vertices so that this axis is now the z-axis.
-                int kz = max_dimension(abs(ray.d));
-                int kx = (kz + 1) % 3; // TODO: % vs if?
-                int ky = (kx + 1) % 3; // TODO: % vs if?
-
-                Vector3f d = permute(ray.d, kx, ky, kz);
-                p0t = permute(p0t, kx, ky, kz);
-                p1t = permute(p1t, kx, ky, kz);
-                p2t = permute(p2t, kx, ky, kz);
-
-                // Apply a shear transformation to the vertices to align them
-                // with the ray facing in the +z direction.
-                // NOTE: only applying x/y here; z is not needed for the next
-                // two intersection tests.
-                // TODO: precompute coefficients (sx, sy, sz), store in Ray
-                float sx = -d.x / d.z;
-                float sy = -d.y / d.z;
-                float sz = 1.0f / d.z;
-                p0t.x += sx * p0t.z;
-                p0t.y += sy * p0t.z;
-                p1t.x += sx * p1t.z;
-                p1t.y += sy * p1t.z;
-                p2t.x += sx * p2t.z;
-                p2t.y += sy * p2t.z;
-
-                // Signed edge function values.
-                float e0 = p1t.x * p2t.y - p1t.y * p2t.x;
-                float e1 = p2t.x * p0t.y - p2t.y * p0t.x;
-                float e2 = p0t.x * p1t.y - p0t.y * p1t.x;
-
-                // Fall back to double precision when testing triangle edges.
-                if ((e0 == 0) || (e1 == 0) || (e2 == 0))
-                {
-                    e0 = (float)((double)p1t.x * (double)p2t.y - (double)p1t.y * (double)p2t.x);
-                    e1 = (float)((double)p2t.x * (double)p0t.y - (double)p2t.y * (double)p0t.x);
-                    e2 = (float)((double)p0t.x * (double)p1t.y - (double)p0t.y * (double)p1t.x);
-                }
-
-                // Test triangle edges for containment.
-                if (((e0 < 0) || (e1 < 0) || (e2 < 0)) && ((e0 > 0) || (e1 > 0) || (e2 > 0)))
-                    continue;
-
-                // Ray is approaching edge-on.
-                float det = e0 + e1 + e2;
-                if (det == 0)
-                    continue;
-
-                // Apply the z-component of the shear transformation now.
-                p0t.z *= sz;
-                p1t.z *= sz;
-                p2t.z *= sz;
-
-                // Scaled hit distance and corresponding range tests.
-                float t_scaled = e0 * p0t.z + e1 * p1t.z + e2 * p2t.z;
-                if ((det < 0) && ((t_scaled >= 0) || (t_scaled < ray.tmax * det)))
-                    continue;
-                if ((det > 0) && ((t_scaled <= 0) || (t_scaled > ray.tmax * det)))
-                    continue;
-
-                // Compute barycentric coordinates.
-                float inv_det = 1 / det;
-                float b0 = e0 * inv_det;
-                float b1 = e1 * inv_det;
-                float b2 = e2 * inv_det;
-                float t = t_scaled * inv_det;
-
-                Vector3f hit = b0 * p0 + b1 * p1 + b2 * p2;
-
-                Vector3f n;
-                if ((tri.ni[0] == -1) || (tri.ni[1] == -1) || (tri.ni[2] == -1))
-                {
-                    // TODO: precompute, store in MeshData?
-                    Vector3f dp02 = p0 - p2;
-                    Vector3f dp12 = p1 - p2;
-                    n = normalize(cross(dp02, dp12));
-                }
-                else
-                {
-                    const Vector3f &n0 = mesh.data.n[tri.ni[0]];
-                    const Vector3f &n1 = mesh.data.n[tri.ni[1]];
-                    const Vector3f &n2 = mesh.data.n[tri.ni[2]];
-                    n = b0 * n0 + b1 * n1 + b2 * n2;
-                }
-
-                intersection->p = hit;
-                intersection->n = n;
-
-                ray.tmax = t;
-
+            // TODO CLEANUP: get rid of t out parameter?
+            float t;
+            if (entity.intersect(ray, &t, intersection))
                 intersects = true;
-            }
         }
 
         return intersects;
     }
+
+    void add_mesh(const std::shared_ptr<Mesh> &mesh)
+    {
+        for (const TriangleData &t : mesh->data.tris)
+            entities.push_back(Entity(std::make_shared<Triangle>(mesh, t), nullptr));
+    }
 };
 
+// TODO: return spectrum
 static Vector3f incident_radiance(const Scene &scene, const Ray &ray)
 {
     Intersection intersection;
@@ -841,20 +1047,18 @@ static void render(const Scene &scene, const Camera &camera, Film &film)
 
 int main(int argc, char *argv[])
 {
-    UNUSED(argc);
-    UNUSED(argv);
-
     Scene scene;
-    scene.spheres.push_back(Sphere(translate(Vector3f(10, 10, 4)), 0.5));
-    scene.spheres.push_back(Sphere(translate(Vector3f(-1.25, 0, 0)), 0.1));
-    scene.spheres.push_back(Sphere(translate(Vector3f(-3.75, 0, 0)), 0.03333));
-    scene.spheres.push_back(Sphere(translate(Vector3f( 1.25, 0, 0)), 0.3));
-    scene.spheres.push_back(Sphere(translate(Vector3f( 3.75, 0, 0)), 0.9));
-    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/floor.obj")));
-    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate1.obj")));
-    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate2.obj")));
-    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate3.obj")));
-    scene.meshes.push_back(create_mesh(Transform(), load_obj("asset/veach_mi/plate4.obj")));
+    scene.entities.push_back(Entity(std::make_shared<Sphere>(translate(Vector3f(10, 10, 4)), 0.5), std::make_shared<Light>(1)));
+    scene.entities.push_back(Entity(std::make_shared<Sphere>(translate(Vector3f(-1.25, 0, 0)), 0.1), std::make_shared<Light>(1)));
+    scene.entities.push_back(Entity(std::make_shared<Sphere>(translate(Vector3f(-3.75, 0, 0)), 0.03333), std::make_shared<Light>(1)));
+    scene.entities.push_back(Entity(std::make_shared<Sphere>(translate(Vector3f( 1.25, 0, 0)), 0.3), std::make_shared<Light>(1)));
+    scene.entities.push_back(Entity(std::make_shared<Sphere>(translate(Vector3f( 3.75, 0, 0)), 0.9), std::make_shared<Light>(1)));
+
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/floor.obj")));
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate1.obj")));
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate2.obj")));
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate3.obj")));
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate4.obj")));
 
     Film film(Vector2i(768, 512));
     Camera camera(look_at(Vector3f(0, 2, 15), Vector3f(0, -2, 2.5), Vector3f(0, 1, 0)), radians(28), &film);
