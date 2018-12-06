@@ -120,6 +120,12 @@ inline float dot(const Vector3<T> &a, const Vector3<T> &b)
 }
 
 template<typename T>
+inline float abs_dot(const Vector3<T> &a, const Vector3<T> &b)
+{
+    return std::abs(dot(a, b));
+}
+
+template<typename T>
 inline Vector3<T> cross(const Vector3<T> &a, const Vector3<T> &b)
 {
     double ax = a.x, ay = a.y, az = a.z;
@@ -127,6 +133,18 @@ inline Vector3<T> cross(const Vector3<T> &a, const Vector3<T> &b)
     return Vector3<T>((ay * bz) - (az * by),
                       (az * bx) - (ax * bz),
                       (ax * by) - (ay * bx));
+}
+
+template<typename T>
+inline float distance(const Vector3<T> &a, const Vector3<T> &b)
+{
+    return (a - b).length();
+}
+
+template<typename T>
+inline float distance_squared(const Vector3<T> &a, const Vector3<T> &b)
+{
+    return (a - b).length_squared();
 }
 
 template<typename T>
@@ -141,10 +159,30 @@ inline Vector3<T> permute(const Vector3<T> &v, int x, int y, int z)
     return Vector3<T>(v[x], v[y], v[z]);
 }
 
+template<typename T>
+inline void coordinate_system(const Vector3<T> &v0, Vector3<T> *v1, Vector3<T> *v2)
+{
+    // TODO: does this work for right-handed coordinate systems?
+    if (std::abs(v0.x) > std::abs(v0.y))
+        *v1 = Vector3<T>(-v0.z, 0, v0.x) / std::sqrt(v0.x * v0.x + v0.z * v0.z);
+    else
+        *v1 = Vector3<T>(0, v0.z, -v0.y) / std::sqrt(v0.y * v0.y + v0.z * v0.z);
+
+    *v2 = cross(v0, *v1);
+}
+
 typedef Vector2<float> Vector2f;
 typedef Vector2<int>   Vector2i;
 typedef Vector3<float> Vector3f;
 typedef Vector3<int>   Vector3i;
+
+inline Vector3f spherical_direction(float sin_theta, float cos_theta, float phi,
+                                    const Vector3f &x, const Vector3f &y, const Vector3f &z)
+{
+    return sin_theta * std::cos(phi) * x +
+           sin_theta * std::sin(phi) * y +
+           cos_theta * z;
+}
 
 struct Ray
 {
