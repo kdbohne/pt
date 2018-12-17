@@ -4,6 +4,7 @@
 #include "vector.h"
 #include "point.h"
 #include "ray.h"
+#include "intersection.h"
 
 struct Transform
 {
@@ -16,6 +17,7 @@ struct Transform
 
     Transform operator*(const Transform &t) const;
     Ray operator*(const Ray &r) const;
+    Intersection operator*(const Intersection &is) const;
 
     template<typename T>
     inline Vector3<T> operator*(const Vector3<T> &v) const;

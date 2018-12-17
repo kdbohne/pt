@@ -3,7 +3,7 @@ CXXFLAGS += -std=c++17 -O0 -g
 CXXFLAGS += -Werror -Wall -Wextra -Wshadow -Wpedantic
 CXXFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable # TODO: disable for production builds
 
-OBJECTS := main.o common.o matrix.o transform.o camera.o film.o
+OBJECTS := main.o common.o matrix.o transform.o camera.o film.o geometry.o light.o
 OBJECTS := $(addprefix build/, $(OBJECTS))
 
 .PHONY: default

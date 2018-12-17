@@ -14,6 +14,19 @@ Ray Transform::operator*(const Ray &r) const
     return Ray(o, d, r.tmax, r.time);
 }
 
+Intersection Transform::operator*(const Intersection &is) const
+{
+    Intersection result;
+    // TODO: handle error
+    result.p = (*this) * is.p;
+    result.n = (*this) * is.n;
+    result.wo = (*this) * is.wo;
+    result.time = is.time;
+    result.entity = is.entity;
+
+    return result;
+}
+
 Transform inverse(const Transform &t)
 {
     return Transform(t.inv, t.m);
