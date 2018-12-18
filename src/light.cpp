@@ -1,9 +1,14 @@
 #include "light.h"
 #include "geometry.h"
 
-Vector3f Light::L(const Intersection &is, const Vector3f &w) const
+Light::Light(const Spectrum &Lemit, const std::shared_ptr<Geometry> &geometry)
+    : Lemit(Lemit), geometry(geometry)
 {
-    return (dot(is.n, w) > 0) ? Lemit : Vector3f(0);
+}
+
+Spectrum Light::L(const Intersection &is, const Vector3f &w) const
+{
+    return (dot(is.n, w) > 0) ? Lemit : Spectrum(0);
 }
 
 #if 0

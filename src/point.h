@@ -3,6 +3,52 @@
 #include "vector.h"
 
 template<typename T>
+struct Point2
+{
+    T x, y;
+
+    Point2() : x(0), y(0) {}
+    Point2(T x, T y) : x(x), y(y) {}
+
+    template<typename U>
+    explicit Point2(const Vector2<U> &v) : x((T)v.x), y((T)v.y) {}
+
+    template<typename U>
+    explicit operator Vector2<U>() const
+    {
+        return Vector2<U>((U)x, (U)y);
+    }
+
+    Point2<T> operator+(const Point2<T> &p) const
+    {
+        return Point2<T>(x + p.x, y + p.y);
+    }
+
+    Point2<T> operator+(const Vector2<T> &v) const
+    {
+        return Point2<T>(x + v.x, y + v.y);
+    }
+
+    Vector2<T> operator-(const Point2<T> &p) const
+    {
+        return Vector2<T>(x - p.x, y - p.y);
+    }
+
+    Point2<T> operator*(T s) const
+    {
+        return Point2<T>(x * s, y * s);
+    }
+
+    Point2<T> operator/(T s) const
+    {
+        return Point2<T>(x / s, y / s);
+    }
+};
+
+typedef Point2<float> Point2f;
+typedef Point2<int>   Point2i;
+
+template<typename T>
 struct Point3
 {
     T x, y, z;
@@ -46,6 +92,7 @@ struct Point3
 };
 
 typedef Point3<float> Point3f;
+typedef Point3<int>   Point3i;
 
 template<typename T>
 inline Point3<T> operator*(T s, const Point3<T> &p)

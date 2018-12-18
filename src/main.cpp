@@ -7,6 +7,7 @@
 #include "film.h"
 #include "geometry.h"
 #include "light.h"
+#include "spectrum.h"
 
 #include <fstream>
 #include <sstream>
@@ -154,21 +155,22 @@ static Vector3f uniform_sample_all_lights(const Scene &scene, const Intersection
 }
 #endif
 
-// TODO: return spectrum
-static Vector3f Li(const Scene &scene, const Ray &ray)
+static Spectrum Li(const Scene &scene, const Ray &ray)
 {
-    Intersection intersection;
-    if (!scene.intersect(ray, &intersection))
+    Spectrum L(0);
+
+    Intersection is;
+    if (!scene.intersect(ray, &is))
     {
         // TODO: light emission
-        return Vector3f(0, 0, 0);
+        return L;
     }
 
-    return intersection.n * 0.5 + Vector3f(0.5, 0.5, 0.5);
+    // TODO FIXME
+
+    return L;
 
 #if 0
-    Vector3f radiance;
-
     const std::shared_ptr<Light> &light = intersection.entity->light;
     if (light)
         radiance += light->L(intersection, intersection.wo);
@@ -193,8 +195,8 @@ static void render(const Scene &scene, const Camera &camera, Film &film)
             Ray ray;
             camera.generate_ray(cs, &ray);
 
-            Vector3f radiance = Li(scene, ray);
-            film.pixels[y * film.resolution.x + x].rgb = radiance;
+            Spectrum L = Li(scene, ray);
+            film.set_pixel(x, y, L);
         }
     }
 }
@@ -215,12 +217,12 @@ int main(int argc, char *argv[])
     scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate3.obj")));
     scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate4.obj")));
 
-    Film film(Vector2i(768, 512) / 2);
+    Film film(Point2i(768, 512) / 2);
     Camera camera(look_at(Vector3f(0, 2, 15), Vector3f(0, -2, 2.5), Vector3f(0, 1, 0)), radians(28), &film);
 #endif
 
 #if 0
-    Film film(Vector2i(640, 360));
+    Film film(Point2i(640, 360));
     Camera camera(look_at(Vector3f(8, 2, 3), Vector3f(0, 0, 0), Vector3f(0, 1, 0)), radians(40), &film);
 
     scene.entities.push_back(Entity(std::make_shared<Sphere>(translate(Vector3f(0, 0, 0)), 1), nullptr));
