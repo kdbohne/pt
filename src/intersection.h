@@ -10,6 +10,9 @@ struct Intersection
 {
     Point3f p;
     Normal3f n;
+    Vector3f wo;
+
+    Vector3f t, b;
 
     float time;
 

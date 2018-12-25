@@ -4,7 +4,7 @@
 static constexpr float SHADOW_EPSILON = 0.0001;
 
 Intersection::Intersection(const Point3f &p)
-    : p(p), n(Normal3f()), time(0), entity(nullptr)
+    : p(p), n(Normal3f()), wo(Vector3f()), time(0), entity(nullptr)
 {
 }
 

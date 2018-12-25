@@ -15,6 +15,16 @@ inline float radians(float deg)
     return deg * (PI / 180.0f);
 }
 
+template<typename T, typename U, typename V>
+inline T clamp(T v, U min, V max)
+{
+    if (v < min)
+        return min;
+    if (v > max)
+        return max;
+    return v;
+}
+
 // Numerically-stable quadratic equation as written in Physically Based
 // Rendering, Third Edition, pp. 1079-1080.
 inline bool quadratic(float a, float b, float c, float *t0, float *t1)

@@ -47,7 +47,7 @@ bool Sphere::intersect(const Ray &ray, Intersection *intersection) const
     Intersection object_is;
     object_is.p = hit;
     object_is.n = normalize(Normal3f(hit));
-//    object_is.wo = -r.d;
+    object_is.wo = -r.d;
 //    object_is.time = r.time;
 //    object_is.uv = ; // TODO FIXME
 //    object_is.dpdu = ; // TODO FIXME
@@ -282,14 +282,14 @@ bool Triangle::intersect(const Ray &ray, Intersection *intersection) const
 
     intersection->p = p_hit;
     intersection->n = n;
-//    intersection->wo = -ray.d;
+    intersection->wo = -ray.d;
 //    intersection->uv = uv_hit;
 //    intersection->dpdu = dpdu;
 //    intersection->dpdv = dpdv;
 //    intersection->dndu = dndu; // TODO
 //    intersection->dndv = dndv; // TODO
-//    intersection->t = normalize(dpdu);
-//    intersection->b = cross(intersection->n, intersection->t);
+    intersection->t = normalize(dpdu);
+    intersection->b = cross(intersection->n, intersection->t);
 
     ray.tmax = t;
 
