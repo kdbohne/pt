@@ -1,22 +1,42 @@
 #include "light.h"
-#include "geometry.h"
+#include "transform.h"
+#include "intersection.h"
+#include "math.h"
+#include "scene.h"
 
-Light::Light(const Spectrum &Lemit, const std::shared_ptr<Geometry> &geometry)
-    : Lemit(Lemit), geometry(geometry)
+VisibilityTest::VisibilityTest(const Intersection &p0, const Intersection &p1)
+    : p0(p0), p1(p1)
 {
 }
 
-Spectrum Light::L(const Intersection &is, const Vector3f &w) const
+bool VisibilityTest::unoccluded(const Scene &scene)
 {
-    return (dot(is.n, w) > 0) ? Lemit : Spectrum(0);
+    // TODO: intersect_p()
+    Intersection is;
+    return !scene.intersect(p0.spawn_ray_to(p1), &is);
 }
 
-#if 0
-Vector3f Light::sample_Li(const Intersection &ref, const Vector2f &u, Vector3f *wi, float *pdf) const
+Spectrum Light::Le(const Vector3f &wo) const
 {
-    Intersection geo_is = geometry->sample(ref, u, pdf);
-    *wi = normalize(geo_is.p - ref.p);
-    // TODO: visibility tester
-    return L(geo_inter, -(*wi));
+    return Spectrum(0);
 }
-#endif
+
+PointLight::PointLight(const Transform &light_to_world, const Spectrum &I)
+    : p(light_to_world * Point3f(0, 0, 0)), I(I)
+{
+}
+
+Spectrum PointLight::sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const
+{
+    *wi = normalize(p - ref.p);
+    *pdf = 1;
+
+    *vis = VisibilityTest(ref, Intersection(p));
+
+    return I / distance_squared(p, ref.p);
+}
+
+Spectrum PointLight::power() const
+{
+    return 4 * PI * I;
+}

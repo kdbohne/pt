@@ -1,12 +1,5 @@
 #include "spectrum.h"
 
-template<int N>
-CoefficientSpectrum<N>::CoefficientSpectrum(float v)
-{
-    for (int i = 0; i < N; ++i)
-        c[i] = v;
-}
-
 RgbSpectrum::RgbSpectrum(float v)
     : CoefficientSpectrum<3>(v)
 {
@@ -15,6 +8,13 @@ RgbSpectrum::RgbSpectrum(float v)
 RgbSpectrum::RgbSpectrum(const CoefficientSpectrum<3> &v)
     : CoefficientSpectrum<3>(v)
 {
+}
+
+RgbSpectrum::RgbSpectrum(float r, float g, float b)
+{
+    c[0] = r;
+    c[1] = g;
+    c[2] = b;
 }
 
 void RgbSpectrum::to_xyz(float xyz[3]) const

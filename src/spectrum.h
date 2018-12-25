@@ -1,22 +1,88 @@
 #pragma once
 
+#include "common.h"
+
 template<int N>
 struct CoefficientSpectrum
 {
-    static const int samples_count = N;
     float c[N];
 
-    CoefficientSpectrum(float v = 0.0);
+    CoefficientSpectrum(float v = 0.0)
+    {
+        for (int i = 0; i < N; ++i)
+            c[i] = v;
+    }
 
-    virtual void to_xyz(float xyz[3]) const = 0;
+    CoefficientSpectrum<N> operator+(const CoefficientSpectrum<N> &s) const
+    {
+        CoefficientSpectrum<N> result = *this;
+        for (int i = 0; i < N; ++i)
+            result.c[i] += s.c[i];
+
+        return result;
+    }
+
+    CoefficientSpectrum<N> &operator+=(const CoefficientSpectrum<N> &s)
+    {
+        for (int i = 0; i < N; ++i)
+            c[i] += s.c[i];
+
+        return *this;
+    }
+
+    CoefficientSpectrum<N> operator*(const CoefficientSpectrum<N> &s) const
+    {
+        CoefficientSpectrum<N> result = *this;
+        for (int i = 0; i < N; ++i)
+            result.c[i] *= s.c[i];
+
+        return result;
+    }
+
+    CoefficientSpectrum<N> operator*(float s) const
+    {
+        CoefficientSpectrum<N> result = *this;
+        for (int i = 0; i < N; ++i)
+            result.c[i] *= s;
+
+        return result;
+    }
+
+    CoefficientSpectrum<N> operator/(float s) const
+    {
+        assert(s != 0);
+
+        CoefficientSpectrum<N> result = *this;
+        for (int i = 0; i < N; ++i)
+            result.c[i] /= s;
+
+        return result;
+    }
+
+    bool is_black() const
+    {
+        for (int i = 0; i < N; ++i)
+        {
+            if (c[i] != 0)
+                return false;
+        }
+        return true;
+    }
 };
+
+template<int N>
+inline CoefficientSpectrum<N> operator*(float s, const CoefficientSpectrum<N> &cs)
+{
+    return cs * s;
+}
 
 struct RgbSpectrum : public CoefficientSpectrum<3>
 {
     RgbSpectrum(float v = 0.0);
+    RgbSpectrum(float r, float g, float b);
     RgbSpectrum(const CoefficientSpectrum<3> &v);
 
-    void to_xyz(float *xyz) const override;
+    void to_xyz(float xyz[3]) const;
 };
 
 // TODO: SampledSpectrum

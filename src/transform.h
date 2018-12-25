@@ -23,6 +23,8 @@ struct Transform
     inline Vector3<T> operator*(const Vector3<T> &v) const;
     template<typename T>
     inline Point3<T> operator*(const Point3<T> &p) const;
+    template<typename T>
+    inline Normal3<T> operator*(const Normal3<T> &n) const;
 };
 
 Transform inverse(const Transform &t);
@@ -54,4 +56,13 @@ inline Point3<T> Transform::operator*(const Point3<T> &p) const
         return Point3<T>(xp, yp, zp);
     else
         return Point3<T>(xp, yp, zp) / wp;
+}
+
+template<typename T>
+inline Normal3<T> Transform::operator*(const Normal3<T> &n) const
+{
+    T x = n.x, y = n.y, z = n.z;
+    return Normal3<T>(inv.m[0][0] * x + inv.m[0][1] * y + inv.m[0][2] * z,
+                      inv.m[1][0] * x + inv.m[1][1] * y + inv.m[1][2] * z,
+                      inv.m[2][0] * x + inv.m[2][1] * y + inv.m[2][2] * z);
 }

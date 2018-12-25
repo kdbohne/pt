@@ -1,24 +1,39 @@
 #pragma once
 
-#include "vector.h"
 #include "intersection.h"
 #include "spectrum.h"
+#include "vector.h"
+#include "point.h"
 
-#include <memory>
+struct Scene;
+struct Transform;
 
-struct Geometry;
+class VisibilityTest
+{
+public:
+    VisibilityTest() {}
+    VisibilityTest(const Intersection &p0, const Intersection &p1);
+
+    bool unoccluded(const Scene &scene);
+
+private:
+    Intersection p0, p1;
+};
 
 struct Light
 {
-    Spectrum Lemit;
-    std::shared_ptr<Geometry> geometry;
+    virtual Spectrum Le(const Vector3f &wo) const;
+    virtual Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const = 0;
+    virtual Spectrum power() const = 0;
+};
 
-    Light(const Spectrum &Lemit, const std::shared_ptr<Geometry> &geometry);
+struct PointLight : public Light
+{
+    Point3f p;
+    Spectrum I;
 
-    Spectrum L(const Intersection &intersection, const Vector3f &w) const;
+    PointLight(const Transform &light_to_world, const Spectrum &I);
 
-#if 0
-    // TODO: visibility tester
-    Spectrum sample_Li(const Intersection &ref, const Vector2f &u, Vector3f *wi, float *pdf) const;
-#endif
+    Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const override;
+    Spectrum power() const override;
 };

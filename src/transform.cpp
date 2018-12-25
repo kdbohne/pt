@@ -16,13 +16,11 @@ Ray Transform::operator*(const Ray &r) const
 
 Intersection Transform::operator*(const Intersection &is) const
 {
-    Intersection result;
+    Intersection result = is;
     // TODO: handle error
-    result.p = (*this) * is.p;
-    result.n = (*this) * is.n;
-    result.wo = (*this) * is.wo;
-    result.time = is.time;
-    result.entity = is.entity;
+    result.p = (*this) * result.p;
+    result.n = (*this) * result.n;
+//    result.wo = (*this) * result.wo;
 
     return result;
 }

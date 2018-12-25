@@ -18,6 +18,13 @@ void Film::set_pixel(int x, int y, const Spectrum &v)
         pixels[y * resolution.x + x].xyz[i] = xyz[i];
 }
 
+static void tone_map_reinhard(float *rgb)
+{
+    rgb[0] /= 1 + rgb[0];
+    rgb[1] /= 1 + rgb[1];
+    rgb[2] /= 1 + rgb[2];
+}
+
 void Film::write_ppm(const std::string &path) const
 {
     std::ofstream file(path);
@@ -35,7 +42,8 @@ void Film::write_ppm(const std::string &path) const
             float rgb[3];
             xyz_to_rgb(p->xyz, rgb);
 
-            // TODO: tone mapping
+            tone_map_reinhard(rgb);
+
             int r = (int)(rgb[0] * 255);
             int g = (int)(rgb[1] * 255);
             int b = (int)(rgb[2] * 255);

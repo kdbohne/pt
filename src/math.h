@@ -6,6 +6,9 @@
 #undef INFINITY
 static constexpr float INFINITY = std::numeric_limits<float>::infinity();
 static constexpr float PI = 3.14159265358979323846;
+static constexpr float INV_PI = 0.31830988618379067154;
+static constexpr float PI_OVER_2 = 1.57079632679489661923;
+static constexpr float PI_OVER_4 = 0.78539816339744830961;
 
 inline float radians(float deg)
 {

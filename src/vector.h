@@ -4,6 +4,9 @@
 #include "common.h"
 
 template<typename T>
+struct Normal3;
+
+template<typename T>
 struct Vector2
 {
     T x, y;
@@ -109,7 +112,7 @@ typedef Vector3<float> Vector3f;
 typedef Vector3<int>   Vector3i;
 
 template<typename T>
-inline Vector3<T> operator*(float s, const Vector3<T> &v)
+inline Vector3<T> operator*(T s, const Vector3<T> &v)
 {
     return v * s;
 }
@@ -127,19 +130,53 @@ inline Vector3<T> abs(const Vector3<T> &v)
 }
 
 template<typename T>
-inline float dot(const Vector3<T> &a, const Vector3<T> &b)
+inline T dot(const Vector3<T> &a, const Vector3<T> &b)
 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
 }
 
 template<typename T>
-inline float abs_dot(const Vector3<T> &a, const Vector3<T> &b)
+inline T dot(const Vector3<T> &a, const Normal3<T> &b)
+{
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
+}
+
+template<typename T>
+inline T dot(const Normal3<T> &a, const Vector3<T> &b)
+{
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
+}
+
+template<typename T>
+inline T abs_dot(const Vector3<T> &a, const Vector3<T> &b)
+{
+    return std::abs(dot(a, b));
+}
+
+template<typename T>
+inline T abs_dot(const Vector3<T> &a, const Normal3<T> &b)
+{
+    return std::abs(dot(a, b));
+}
+
+template<typename T>
+inline T abs_dot(const Normal3<T> &a, const Vector3<T> &b)
 {
     return std::abs(dot(a, b));
 }
 
 template<typename T>
 inline Vector3<T> cross(const Vector3<T> &a, const Vector3<T> &b)
+{
+    double ax = a.x, ay = a.y, az = a.z;
+    double bx = b.x, by = b.y, bz = b.z;
+    return Vector3<T>((ay * bz) - (az * by),
+                      (az * bx) - (ax * bz),
+                      (ax * by) - (ay * bx));
+}
+
+template<typename T>
+inline Vector3<T> cross(const Normal3<T> &a, const Vector3<T> &b)
 {
     double ax = a.x, ay = a.y, az = a.z;
     double bx = b.x, by = b.y, bz = b.z;

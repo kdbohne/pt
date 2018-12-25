@@ -19,6 +19,18 @@ struct Point2
         return Vector2<U>((U)x, (U)y);
     }
 
+    T operator[](int i) const
+    {
+        assert((i >= 0) && (i <= 1));
+        return *(&x + i);
+    }
+
+    T &operator[](int i)
+    {
+        assert((i >= 0) && (i <= 1));
+        return *(&x + i);
+    }
+
     Point2<T> operator+(const Point2<T> &p) const
     {
         return Point2<T>(x + p.x, y + p.y);
@@ -32,6 +44,11 @@ struct Point2
     Vector2<T> operator-(const Point2<T> &p) const
     {
         return Vector2<T>(x - p.x, y - p.y);
+    }
+
+    Point2<T> operator-(const Vector2<T> &v) const
+    {
+        return Point2<T>(x - v.x, y - v.y);
     }
 
     Point2<T> operator*(T s) const
@@ -49,6 +66,12 @@ typedef Point2<float> Point2f;
 typedef Point2<int>   Point2i;
 
 template<typename T>
+inline Point2<T> operator*(T s, const Point2<T> &p)
+{
+    return p * s;
+}
+
+template<typename T>
 struct Point3
 {
     T x, y, z;
@@ -63,6 +86,18 @@ struct Point3
     explicit operator Vector3<U>() const
     {
         return Vector3<U>((U)x, (U)y, (U)z);
+    }
+
+    T operator[](int i) const
+    {
+        assert((i >= 0) && (i <= 2));
+        return *(&x + i);
+    }
+
+    T &operator[](int i)
+    {
+        assert((i >= 0) && (i <= 2));
+        return *(&x + i);
     }
 
     Point3<T> operator+(const Point3<T> &p) const
@@ -83,6 +118,14 @@ struct Point3
     Point3<T> operator*(T s) const
     {
         return Point3<T>(x * s, y * s, z * s);
+    }
+
+    Point3<T> &operator*=(T s)
+    {
+        x *= s;
+        y *= s;
+        z *= s;
+        return *this;
     }
 
     Point3<T> operator/(T s) const

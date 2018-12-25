@@ -2,98 +2,20 @@
 #include "vector.h"
 #include "point.h"
 #include "ray.h"
+#include "entity.h"
 #include "transform.h"
 #include "camera.h"
 #include "film.h"
 #include "geometry.h"
 #include "light.h"
 #include "spectrum.h"
+#include "bsdf.h"
+#include "scene.h"
+#include "sampling.h"
 
 #include <fstream>
 #include <sstream>
 #include <memory>
-
-static Vector3f uniform_sample_sphere(const Vector2f &u)
-{
-    float z = 1 - 2 * u[0];
-    float r = std::sqrt(std::max((float)0, (float)1 - z * z));
-    float phi = 2 * PI * u[1];
-    return Vector3f(r * std::cos(phi), r * std::sin(phi), z);
-}
-
-static float uniform_cone_pdf(float cos_theta_max)
-{
-    return 1 / (2 * PI * (1 - cos_theta_max));
-}
-
-struct Entity
-{
-    std::shared_ptr<Geometry> geometry;
-    std::shared_ptr<Light> light;
-
-    Entity(const std::shared_ptr<Geometry> &geometry, const std::shared_ptr<Light> &light) : geometry(geometry), light(light) {}
-
-    bool intersect(const Ray &ray, Intersection *intersection) const
-    {
-        if (!geometry->intersect(ray, intersection))
-            return false;
-
-        intersection->entity = this;
-        return true;
-    }
-
-#if 0
-    // TODO: return spectrum
-    // TODO: visibility tester
-    Vector3f sample(const Intersection &ref, const Vector2f &u,
-                          Vector3f *wi, float *pdf) const
-    {
-        assert(light);
-
-        Intersection intersection = geometry->sample(ref, u);
-        *wi = normalize(intersection.p - ref.p);
-        *pdf = geometry->pdf(ref, *wi);
-        // TODO: visibility tester
-        return light->radiance(intersection, -(*wi));
-    }
-#endif
-};
-
-struct Scene
-{
-    std::vector<Entity> entities;
-
-    bool intersect(const Ray &ray, Intersection *intersection) const
-    {
-        bool intersects = false;
-
-        for (const Entity &entity : entities)
-        {
-            // TODO CLEANUP: get rid of t out parameter?
-            if (entity.intersect(ray, intersection))
-                intersects = true;
-        }
-
-        return intersects;
-    }
-
-    void add_light(const std::shared_ptr<Geometry> geo, float emittance)
-    {
-        entities.push_back(Entity(geo, std::make_shared<Light>(emittance, geo)));
-    }
-
-    void add_mesh(const std::shared_ptr<Mesh> &mesh)
-    {
-        for (const TriangleData &t : mesh->data.tris)
-            entities.push_back(Entity(std::make_shared<Triangle>(mesh, t), nullptr));
-    }
-};
-
-static float uniform_float()
-{
-    // TODO: improve
-    return (float)drand48();
-}
 
 #if 0
 static float power_heuristic(int nf, float fpdf, int ng, float gpdf)
@@ -103,37 +25,96 @@ static float power_heuristic(int nf, float fpdf, int ng, float gpdf)
     return (f * f) / (f * f + g * g);
 }
 
-// TODO: spectrum
-static Vector3f estimate_direct(const Light &light, const Intersection &intersection)
+static Spectrum estimate_direct(const Scene &scene, const Intersection &is, const Light &light, const Point2f &u_scattering, bool specular = false)
 {
-    // TODO: spectrum
-    Vector3f direct(0);
-
-    Vector2f u_light(uniform_float(), uniform_float());
-    Vector3f wi;
-    float light_pdf = 0;
-    float scattering_pdf = 0;
-    Vector3f incident = light.sample_incident_radiance(intersection, u_light, &wi, &light_pdf);
-    if ((light_pdf > 0)/* && !incident.is_black()*/) // TODO: spectrum
+    const std::shared_ptr<Bsdf> &bsdf = is.entity->bsdf;
+    if (!bsdf)
     {
-        Vector3f f(1); // TODO FIXME
-        if (true/*!f.is_black()*/) // TODO FIXME
+        // TODO: default material
+        return Spectrum(0);
+    }
+
+    BxdfType bsdf_flags = specular ? BSDF_ALL : (BxdfType)(BSDF_ALL & ~BSDF_SPECULAR);
+
+    Spectrum Ld(0);
+
+    Point2f u_light(uniform_float(), uniform_float());
+    Vector3f wi;
+    float light_pdf = 0, scattering_pdf = 0;
+    Spectrum Li = light.sample_Li(is, u_light, &wi, &light_pdf);
+
+    if ((light_pdf > 0) && !Li.is_black())
+    {
+        // TODO: assuming always surface intersection; handle participating media
+        Spectrum f = bsdf->f(is, is.wo, wi, bsdf_flags) * abs_dot(wi, is.n); // TODO: normal map (is.shading.n)
+        scattering_pdf = bsdf->pdf(is, is.wo, wi, bsdf_flags);
+
+        if (!f.is_black())
         {
-            // TODO: scattering PDF
             // TODO: visibility
-            float weight = power_heuristic(1, light_pdf, 1, scattering_pdf);
-            direct += Vector3f(f.x * incident.x, f.y * incident.y, f.z * incident.z) * weight / light_pdf;
-//            direct += f * incident * weight / light_pdf;
+            /*
+            if (!visible)
+                Li = Spectrum(0);
+            */
+
+            if (!Li.is_black())
+            {
+                // TODO: delta light
+                float weight = power_heuristic(1, light_pdf, 1, scattering_pdf);
+                Ld += f * Li * weight / light_pdf;
+            }
         }
     }
 
-    return direct;
+#if 0
+//    if (!is_delta_light(light.flags)) // TODO FIXME
+    {
+        // TODO: assuming always surface intersection; handle participating media
+        BxdfType sampled_type;
+        Spectrum f = bsdf->sample_f(is, is.wo, &wi, u_scattering, &scattering_pdf, bsdf_flags, &sampled_type) * abs_dot(wi, is.n); // TODO: normal map (is.shading.n)
+
+        bool sampled_specular = sampled_type & BSDF_SPECULAR;
+
+        if (!f.is_black() && (scattering_pdf > 0))
+        {
+            float weight = 1;
+            if (!sampled_specular)
+            {
+                light_pdf = light.pdf_Li(is, wi);
+                if (light_pdf == 0)
+                    return Ld;
+
+                weight = power_heuristic(1, scattering_pdf, 1, light_pdf);
+            }
+
+            Ray ray = is.spawn_ray(wi);
+
+            Spectrum Tr(1); // NOTE: this would be set by participating media intersect_Tr()
+            Intersection light_is;
+            if (scene.intersect(ray, &light_is))
+            {
+                Li = Spectrum(0);
+                if (light_is.entity->light) // TODO: check if area light
+                    Li = light_is.Le(-wi);
+            }
+            else
+            {
+                Li = light.Le(ray);
+            }
+
+            if (!Li.is_black())
+                Ld += f * Li * Tr * weight / scattering_pdf;
+        }
+    }
+#endif
+
+    return Ld;
 }
 
 // TODO: spectrum
-static Vector3f uniform_sample_all_lights(const Scene &scene, const Intersection &intersection)
+static Spectrum uniform_sample_all_lights(const Scene &scene, const Intersection &intersection)
 {
-    Vector3f radiance(0);
+    Spectrum L(0);
 
     // TODO: keep separate list of lights?
     for (const Entity &entity : scene.entities)
@@ -142,19 +123,26 @@ static Vector3f uniform_sample_all_lights(const Scene &scene, const Intersection
         if (!light)
             continue;
 
-        const int samples_count = 1;
+        Point3f p_light = entity.geometry->object_to_world * Point3f(0, 0, 0);
+        float d = distance(intersection.p, p_light);
 
-        Vector3f direct(0);
+        const int samples_count = 1; // TODO: ?
+
+        Spectrum Ld(0);
         for (int i = 0; i < samples_count; ++i)
-            direct += estimate_direct(*light, intersection);
+        {
+            Point2f u_scattering(uniform_float(), uniform_float()); // TODO: better sampling?
+            Ld += estimate_direct(scene, intersection, *light, u_scattering);
+        }
 
-        radiance += direct / (float)samples_count;
+        L += Ld / (float)samples_count;
     }
 
-    return radiance;
+    return L;
 }
 #endif
 
+#if 0
 static Spectrum Li(const Scene &scene, const Ray &ray)
 {
     Spectrum L(0);
@@ -166,19 +154,138 @@ static Spectrum Li(const Scene &scene, const Ray &ray)
         return L;
     }
 
-    // TODO FIXME
+#if 0
+    if (!is.bsdf)
+        return Li(scene, is.spawn_ray(ray.d));
+#endif
+
+    const std::shared_ptr<Light> &light = is.entity->light;
+    if (light)
+        L += light->L(is, is.wo);
+
+    L += uniform_sample_all_lights(scene, is);
 
     return L;
+}
+#endif
 
 #if 0
-    const std::shared_ptr<Light> &light = intersection.entity->light;
-    if (light)
-        radiance += light->L(intersection, intersection.wo);
+static Spectrum Li(const Scene &scene, const Ray &ray, int depth = 0);
 
-    radiance += uniform_sample_all_lights(scene, intersection);
+static Spectrum specular_reflect(const Scene &scene, const Intersection &is, const Ray &ray, int depth)
+{
+    BxdfType type = (BxdfType)(BSDF_REFLECTION | BSDF_SPECULAR);
+    Point2f u(uniform_float(), uniform_float()); // TODO: better sampling?
 
-    return radiance;
+    Vector3f wi;
+    float pdf;
+    Spectrum f = is.entity->bsdf->sample_f(is, is.wo, &wi, u, &pdf, type, nullptr);
+
+    if ((pdf > 0) && !f.is_black() && (abs_dot(wi, is.n) != 0))
+        return f * Li(scene, ray, depth + 1) * abs_dot(wi, is.n) / pdf;
+
+    return Spectrum(0);
+}
+
+static Spectrum specular_transmit(const Scene &scene, const Intersection &is, const Ray &ray, int depth)
+{
+    // TODO FIXME
+    return Spectrum(0);
+}
+
+static Spectrum Li(const Scene &scene, const Ray &ray, int depth)
+{
+    Spectrum L(0);
+
+    Intersection is;
+    if (!scene.intersect(ray, &is))
+    {
+        // TODO: separate lights list?
+        for (const Entity &entity : scene.entities)
+        {
+            const std::shared_ptr<Light> &light = entity.light;
+            if (!light)
+                continue;
+
+            L += light->Le(ray);
+        }
+
+        return L;
+    }
+
+    if (!is.entity->bsdf)
+        return Li(scene, is.spawn_ray(ray.d), depth);
+
+    L += is.Le(is.wo);
+
+    for (const Entity &entity : scene.entities)
+    {
+        const std::shared_ptr<Light> &light = entity.light;
+        if (!light)
+            continue;
+
+        Point2f u(uniform_float(), uniform_float()); // TODO: better sampling?
+        Vector3f wi;
+        float pdf;
+        Spectrum Li = light->sample_Li(is, u, &wi, &pdf);
+        if (Li.is_black() || (pdf == 0))
+            continue;
+
+        Spectrum f = is.entity->bsdf->f(is, is.wo, wi);
+        if (!f.is_black() /*&& !occluded*/)
+            L += f * Li * abs_dot(wi, is.n) / pdf;
+    }
+
+    static const int MAX_DEPTH = 5;
+    if (depth + 1 < MAX_DEPTH)
+    {
+        L += specular_reflect(scene, is, ray, depth);
+        L += specular_transmit(scene, is, ray, depth);
+    }
+
+    return L;
+}
 #endif
+
+static Spectrum Li(const Scene &scene, const Ray &ray, int depth = 0)
+{
+    Spectrum L(0);
+
+    Intersection is;
+    if (!scene.intersect(ray, &is))
+    {
+        // TODO: background radiance
+        return Spectrum(0);
+    }
+
+    // TODO: does this ever change?
+    Vector3f wo = -ray.d;
+    Normal3f n = is.n;
+
+    // Hit an area light.
+    if (is.entity->light)
+        L += is.entity->light->Le(wo);
+
+    // Sum individual light contributions.
+    for (const Light *light : scene.lights)
+    {
+        Point2f u(uniform_float(), uniform_float());
+
+        Vector3f wi;
+        float pdf;
+        VisibilityTest vis;
+        Spectrum Li = light->sample_Li(is, u, &wi, &pdf, &vis);
+
+        if ((pdf == 0) || Li.is_black())
+            continue;
+
+        Spectrum f = is.entity->bsdf->f();
+
+        if (!f.is_black() && vis.unoccluded(scene))
+            L += f * Li * abs_dot(wi, n) / pdf;
+    }
+
+    return L;
 }
 
 static void render(const Scene &scene, const Camera &camera, Film &film)
@@ -201,21 +308,81 @@ static void render(const Scene &scene, const Camera &camera, Film &film)
     }
 }
 
+static Bsdf *make_matte_material(const Spectrum &Kd)
+{
+    Bsdf *bsdf = new Bsdf;
+
+    if (!Kd.is_black())
+        bsdf->add(new LambertianReflection(Kd));
+
+    return bsdf;
+}
+
+#if 0
+static std::shared_ptr<Bsdf> make_plastic_material(const Spectrum &Kd, const Spectrum &Ks, float roughness)
+{
+    std::shared_ptr<Bsdf> bsdf = std::make_shared<Bsdf>();
+
+    if (!Kd.is_black())
+        bsdf->add(std::make_shared<LambertianReflection>(Kd));
+
+    // TODO FIXME
+#if 0
+    if (!Ks.is_black())
+    {
+        std::shared_ptr<MicrofacetDistribution> distribution = std::make_shared<TrowbridgeReitzDistribution>(roughness, roughness);
+        std::shared_ptr<Fresnel> fresnel = std::make_shared<FresnelDielectric>(1, 1.5);
+        std::shared_ptr<MicrofacetReflection> specular = std::make_shared<MicrofacetReflection>(Ks, distribution, fresnel);
+        bsdf->add(specular);
+    }
+#endif
+
+    return bsdf;
+}
+#endif
+
 int main(int argc, char *argv[])
 {
+    Bsdf *light_bsdf = new Bsdf();
+    light_bsdf->add(new LambertianReflection(Spectrum(0, 0, 0)));
+
     Scene scene;
-#if 1
+    scene.lights.push_back(new PointLight(translate(Vector3f(   10, 10, 4)), Spectrum(    800,     800,     800)));
+    scene.lights.push_back(new PointLight(translate(Vector3f(-1.25,  0, 0)), Spectrum(    100,     100,     100)));
+    scene.lights.push_back(new PointLight(translate(Vector3f(-3.75,  0, 0)), Spectrum(901.803, 901.803, 901.803)));
+    scene.lights.push_back(new PointLight(translate(Vector3f( 1.25,  0, 0)), Spectrum(11.1111, 11.1111, 11.1111)));
+    scene.lights.push_back(new PointLight(translate(Vector3f( 3.75,  0, 0)), Spectrum(1.23457, 1.23457, 1.23457)));
+
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/floor.obj")), make_matte_material(Spectrum(0.4, 0.4, 0.4)));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate1.obj")), make_matte_material(Spectrum(0.07, 0.09, 0.13)));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate2.obj")), make_matte_material(Spectrum(0.07, 0.09, 0.13)));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate3.obj")), make_matte_material(Spectrum(0.07, 0.09, 0.13)));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate4.obj")), make_matte_material(Spectrum(0.07, 0.09, 0.13)));
+#if 0
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate1.obj")), make_plastic_material(Spectrum(0.07, 0.09, 0.13), Spectrum(1, 1, 1), 0.005));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate2.obj")), make_plastic_material(Spectrum(0.07, 0.09, 0.13), Spectrum(1, 1, 1), 0.02));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate3.obj")), make_plastic_material(Spectrum(0.07, 0.09, 0.13), Spectrum(1, 1, 1), 0.05));
+    scene.add_mesh(new Mesh(Transform(), load_obj("asset/veach_mi/plate4.obj")), make_plastic_material(Spectrum(0.07, 0.09, 0.13), Spectrum(1, 1, 1), 0.1));
+#endif
+
+    Film film(Point2i(1152, 864) / 2);
+    Camera camera(look_at(Vector3f(0, 2, 15), Vector3f(0, 1.69521, 14.0476), Vector3f(0, 0.952421, -0.304787)), radians(28), &film);
+
+#if 0
     scene.add_light(std::make_shared<Sphere>(translate(Vector3f(10, 10, 4)), 0.5), 1);
     scene.add_light(std::make_shared<Sphere>(translate(Vector3f(-1.25, 0, 0)), 0.1), 1);
     scene.add_light(std::make_shared<Sphere>(translate(Vector3f(-3.75, 0, 0)), 0.03333), 1);
     scene.add_light(std::make_shared<Sphere>(translate(Vector3f( 1.25, 0, 0)), 0.3), 1);
     scene.add_light(std::make_shared<Sphere>(translate(Vector3f( 3.75, 0, 0)), 0.9), 1);
 
-    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/floor.obj")));
-    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate1.obj")));
-    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate2.obj")));
-    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate3.obj")));
-    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate4.obj")));
+    std::shared_ptr<Bsdf> bsdf = std::make_shared<Bsdf>();
+    bsdf->add(std::make_shared<LambertianReflection>(Spectrum(0.5)));
+
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/floor.obj")), bsdf);
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate1.obj")), bsdf);
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate2.obj")), bsdf);
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate3.obj")), bsdf);
+    scene.add_mesh(std::make_shared<Mesh>(Transform(), load_obj("asset/veach_mi/plate4.obj")), bsdf);
 
     Film film(Point2i(768, 512) / 2);
     Camera camera(look_at(Vector3f(0, 2, 15), Vector3f(0, -2, 2.5), Vector3f(0, 1, 0)), radians(28), &film);
