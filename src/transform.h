@@ -5,6 +5,7 @@
 #include "point.h"
 #include "ray.h"
 #include "intersection.h"
+#include "bounds.h"
 
 struct Transform
 {
@@ -25,6 +26,8 @@ struct Transform
     inline Point3<T> operator*(const Point3<T> &p) const;
     template<typename T>
     inline Normal3<T> operator*(const Normal3<T> &n) const;
+    template<typename T>
+    inline Bounds3<T> operator*(const Bounds3<T> &b) const;
 };
 
 Transform inverse(const Transform &t);
@@ -65,4 +68,21 @@ inline Normal3<T> Transform::operator*(const Normal3<T> &n) const
     return Normal3<T>(inv.m[0][0] * x + inv.m[0][1] * y + inv.m[0][2] * z,
                       inv.m[1][0] * x + inv.m[1][1] * y + inv.m[1][2] * z,
                       inv.m[2][0] * x + inv.m[2][1] * y + inv.m[2][2] * z);
+}
+
+template<typename T>
+inline Bounds3<T> Transform::operator*(const Bounds3<T> &b) const
+{
+    // TODO: optimize?
+    Bounds3<T> result;
+    result = Union(result, (*this) * Point3<T>(b.min.x, b.min.y, b.min.z));
+    result = Union(result, (*this) * Point3<T>(b.min.x, b.min.y, b.max.z));
+    result = Union(result, (*this) * Point3<T>(b.min.x, b.max.y, b.min.z));
+    result = Union(result, (*this) * Point3<T>(b.min.x, b.max.y, b.max.z));
+    result = Union(result, (*this) * Point3<T>(b.max.x, b.min.y, b.min.z));
+    result = Union(result, (*this) * Point3<T>(b.max.x, b.min.y, b.max.z));
+    result = Union(result, (*this) * Point3<T>(b.max.x, b.max.y, b.min.z));
+    result = Union(result, (*this) * Point3<T>(b.max.x, b.max.y, b.max.z));
+
+    return result;
 }

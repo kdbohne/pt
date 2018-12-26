@@ -3,6 +3,10 @@
 #include <limits>
 #include <cmath>
 
+// TODO: is this needed?
+#undef min
+#undef max
+
 #undef INFINITY
 static constexpr float INFINITY = std::numeric_limits<float>::infinity();
 static constexpr float PI = 3.14159265358979323846;

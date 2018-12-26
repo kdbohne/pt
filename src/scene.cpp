@@ -17,5 +17,8 @@ bool Scene::intersect(const Ray &ray, Intersection *intersection) const
 void Scene::add_mesh(Mesh *mesh, Bsdf *bsdf)
 {
     for (const TriangleData &t : mesh->data.tris)
-        entities.push_back(Entity(new Triangle(mesh, t), nullptr, bsdf));
+    {
+        Triangle *triangle = new Triangle(mesh->object_to_world, mesh->world_to_object, mesh, t);
+        entities.push_back(Entity(triangle, nullptr, bsdf));
+    }
 }

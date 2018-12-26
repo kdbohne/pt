@@ -4,14 +4,25 @@
 #include <fstream>
 #include <sstream>
 
-Geometry::Geometry(const Transform &object_to_world)
-    : object_to_world(object_to_world)
+Geometry::Geometry(const Transform &object_to_world, const Transform &world_to_object)
+    : object_to_world(object_to_world), world_to_object(world_to_object)
 {
 }
 
-Sphere::Sphere(const Transform &object_to_world, float radius)
-    : Geometry(object_to_world), radius(radius)
+Bounds3f Geometry::world_bounds() const
 {
+    return object_to_world * object_bounds();
+}
+
+Sphere::Sphere(const Transform &object_to_world, const Transform &world_to_object, float radius)
+    : Geometry(object_to_world, world_to_object), radius(radius)
+{
+}
+
+Bounds3f Sphere::object_bounds() const
+{
+    return Bounds3f(Point3f(-radius, -radius, -radius),
+                    Point3f( radius,  radius,  radius));
 }
 
 bool Sphere::intersect(const Ray &ray, Intersection *intersection) const
@@ -130,17 +141,17 @@ MeshData load_obj(const std::string &path)
     return mesh;
 }
 
-Mesh::Mesh(const Transform &transform, const MeshData &data)
-    : data(data)
+Mesh::Mesh(const Transform &object_to_world, const Transform &world_to_object, const MeshData &data)
+    : object_to_world(object_to_world), world_to_object(world_to_object), data(data)
 {
     for (Point3f &p : this->data.p)
-        p = transform * p;
+        p = object_to_world * p;
     for (Normal3f &n : this->data.n)
-        n = transform * n;
+        n = object_to_world * n;
 }
 
-Triangle::Triangle(const Mesh *mesh, const TriangleData &data)
-    : Geometry(Transform()), mesh(mesh)
+Triangle::Triangle(const Transform &object_to_world, const Transform &world_to_object, const Mesh *mesh, const TriangleData &data)
+    : Geometry(object_to_world, world_to_object), mesh(mesh)
 {
     pi[0] = data.pi[0];
     pi[1] = data.pi[1];
@@ -153,6 +164,24 @@ Triangle::Triangle(const Mesh *mesh, const TriangleData &data)
     uvi[0] = data.uvi[0];
     uvi[1] = data.uvi[1];
     uvi[2] = data.uvi[2];
+}
+
+Bounds3f Triangle::object_bounds() const
+{
+    const Point3f &p0 = mesh->data.p[pi[0]];
+    const Point3f &p1 = mesh->data.p[pi[1]];
+    const Point3f &p2 = mesh->data.p[pi[2]];
+
+    return Union(Bounds3f(world_to_object * p0, world_to_object * p1), world_to_object * p2);
+}
+
+Bounds3f Triangle::world_bounds() const
+{
+    const Point3f &p0 = mesh->data.p[pi[0]];
+    const Point3f &p1 = mesh->data.p[pi[1]];
+    const Point3f &p2 = mesh->data.p[pi[2]];
+
+    return Union(Bounds3f(p0, p1), p2);
 }
 
 bool Triangle::intersect(const Ray &ray, Intersection *intersection) const
