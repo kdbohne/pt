@@ -5,10 +5,8 @@
 #include "sampling.h"
 #include "light.h"
 
-Spectrum Integrator::specular_reflect(const Scene &scene, const Intersection &its, const Ray &ray, int depth) const
+Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its, const Ray &ray, int depth, BxdfType type) const
 {
-    BxdfType type = (BxdfType)(BSDF_REFLECTION | BSDF_SPECULAR);
-
     Point2f u(uniform_float(), uniform_float()); // TODO: better sampling?
 
     Vector3f wi;
@@ -20,6 +18,18 @@ Spectrum Integrator::specular_reflect(const Scene &scene, const Intersection &it
         return f * Li(scene, ray, depth + 1) * abs_dot(wi, its.n) / pdf;
 
     return Spectrum(0);
+}
+
+Spectrum Integrator::specular_reflect(const Scene &scene, const Intersection &its, const Ray &ray, int depth) const
+{
+    BxdfType type = (BxdfType)(BSDF_SPECULAR | BSDF_REFLECTION);
+    return specular_common(scene, its, ray, depth, type);
+}
+
+Spectrum Integrator::specular_transmit(const Scene &scene, const Intersection &its, const Ray &ray, int depth) const
+{
+    BxdfType type = (BxdfType)(BSDF_SPECULAR | BSDF_TRANSMISSION);
+    return specular_common(scene, its, ray, depth, type);
 }
 
 Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) const
@@ -63,7 +73,7 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
     if (depth + 1 < max_depth)
     {
         L += specular_reflect(scene, its, ray, depth);
-//        L += specular_transmit();
+        L += specular_transmit(scene, its, ray, depth);
     }
 
     return L;
