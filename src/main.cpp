@@ -1,23 +1,11 @@
-#include "math.h"
-#include "vector.h"
-#include "point.h"
-#include "ray.h"
-#include "entity.h"
-#include "transform.h"
-#include "camera.h"
-#include "film.h"
-#include "geometry.h"
-#include "light.h"
-#include "spectrum.h"
-#include "bsdf.h"
 #include "scene.h"
-#include "sampling.h"
+#include "camera.h"
 #include "integrator.h"
+#include "film.h"
+#include "ray.h"
+#include "spectrum.h"
 #include "parser.h"
-
-#include <fstream>
-#include <sstream>
-#include <memory>
+#include "light.h"
 
 static void render(const Scene &scene, const Camera &camera, const Integrator &integrator)
 {
@@ -43,19 +31,19 @@ static void render(const Scene &scene, const Camera &camera, const Integrator &i
 
 int main(int argc, char *argv[])
 {
-    Bsdf *light_bsdf = new Bsdf();
-    light_bsdf->add(new LambertianReflection(Spectrum(0, 0, 0)));
+    if (argc != 2)
+    {
+        std::printf("Usage: ./pt <scene>\n");
+        return 0;
+    }
 
-    std::string path = "asset/simple.pbrt";
+    std::string path = argv[1];
 
     Scene scene;
     Camera *camera;
     Integrator *integrator;
     if (!parse_pbrt(path, &scene, &camera, &integrator))
-    {
-        fatal("Failed to read input file: %s", path.c_str());
         return 1;
-    }
 
     for (Light *light : scene.lights)
         light->preprocess(scene);

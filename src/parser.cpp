@@ -118,7 +118,12 @@ struct Parser
     {
         FILE *file = std::fopen(path.c_str(), "r");
         if (!file)
-            fatal("Failed to open file: %s", path.c_str());
+        {
+            error("Failed to open file: %s", path.c_str());
+            c = nullptr;
+
+            return;
+        }
 
         std::fseek(file, 0, SEEK_END);
         int length = std::ftell(file);
@@ -391,6 +396,8 @@ struct Parser
 bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrator **integrator)
 {
     Parser parser(path);
+    if (!parser.c)
+        return false;
 
     Transform camera_to_world;
     float camera_fov = radians(90);
