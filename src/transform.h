@@ -35,7 +35,7 @@ Transform translate(const Vector3f &delta);
 Transform scale(float x, float y, float z);
 
 Transform perspective(float vfov, float aspect, float n, float f);
-Transform look_at(const Vector3f &eye, const Vector3f &target, const Vector3f &up);
+Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up);
 
 template<typename T>
 inline Vector3<T> Transform::operator*(const Vector3<T> &v) const

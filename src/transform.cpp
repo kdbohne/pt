@@ -72,7 +72,7 @@ Transform perspective(float vfov, float aspect, float n, float f)
     return scale(inv_tan / aspect, inv_tan, 1) * Transform(persp);
 }
 
-Transform look_at(const Vector3f &eye, const Vector3f &target, const Vector3f &up)
+Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up)
 {
     Vector3f forward = normalize(target - eye);
     Vector3f right = normalize(cross(forward, up));

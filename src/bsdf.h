@@ -54,6 +54,9 @@ struct Bsdf
     Spectrum sample_f(const Intersection &its, const Vector3f &wo, Vector3f *wi, const Point2f &u, float *pdf, BxdfType type = BSDF_ALL, BxdfType *sampled_type = nullptr) const;
 };
 
+Bsdf *make_matte_material(const Spectrum &Kd);
+Bsdf *make_plastic_material(const Spectrum &Kd, const Spectrum &Ks, float roughness);
+
 struct LambertianReflection : public Bxdf
 {
     const Spectrum R;

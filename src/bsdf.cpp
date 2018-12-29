@@ -181,6 +181,34 @@ float Bsdf::pdf(const Intersection &its, const Vector3f &wo, const Vector3f &wi,
 }
 #endif
 
+Bsdf *make_matte_material(const Spectrum &Kd)
+{
+    Bsdf *bsdf = new Bsdf();
+
+    if (!Kd.is_black())
+        bsdf->add(new LambertianReflection(Kd));
+
+    return bsdf;
+}
+
+Bsdf *make_plastic_material(const Spectrum &Kd, const Spectrum &Ks, float roughness)
+{
+    Bsdf *bsdf = new Bsdf();
+
+    if (!Kd.is_black())
+        bsdf->add(new LambertianReflection(Kd));
+
+    if (!Ks.is_black())
+    {
+        MicrofacetDistribution *distribution = new TrowbridgeReitzDistribution(roughness, roughness);
+        Fresnel *fresnel = new FresnelDielectric(1, 1.5);
+        MicrofacetReflection *specular = new MicrofacetReflection(Ks, distribution, fresnel);
+        bsdf->add(specular);
+    }
+
+    return bsdf;
+}
+
 Spectrum LambertianReflection::f(const Vector3f &wo, const Vector3f &wi) const
 {
     return R * INV_PI;
