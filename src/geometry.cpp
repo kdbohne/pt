@@ -296,7 +296,7 @@ bool Triangle::intersect(const Ray &ray, Intersection *intersection) const
     Point2f uv_hit = b0 * uv[0] + b1 * uv[1] + b2 * uv[2];
 
     Normal3f n;
-    if ((ni[0] == -1) || (ni[1] == -1) || (ni[2] == -1))
+    if (mesh->data.n.empty() || (ni[0] == -1) || (ni[1] == -1) || (ni[2] == -1))
     {
         // TODO: precompute, store in MeshData?
         n = Normal3f(normalize(cross(dp02, dp12)));
