@@ -42,6 +42,7 @@ struct ParameterList
 {
     std::vector<Parameter<int>> ints;
     std::vector<Parameter<float>> floats;
+    std::vector<Parameter<bool>> bools;
     std::vector<Parameter<std::string>> strings;
     std::vector<Parameter<Spectrum>> spectrums;
     std::vector<Parameter<Point3f>> point3fs;
@@ -62,6 +63,17 @@ struct ParameterList
     float find_float(const std::string &name, float default_value) const
     {
         for (const Parameter<float> &param : floats)
+        {
+            if ((param.name == name) && (param.values.size() == 1))
+                return param.values[0];
+        }
+
+        return default_value;
+    }
+
+    bool find_bool(const std::string &name, bool default_value) const
+    {
+        for (const Parameter<bool> &param : bools)
         {
             if ((param.name == name) && (param.values.size() == 1))
                 return param.values[0];
@@ -415,6 +427,32 @@ struct Parser
     }
 };
 
+static Bsdf *make_material(const std::string &name, const ParameterList &params)
+{
+    // TODO: reduce duplication here; creating a new BSDF per call
+
+    if (name == "matte")
+    {
+        Spectrum Kd = params.find_spectrum("Kd", Spectrum(0.5));
+        return make_matte_material(Kd);
+    }
+
+    if (name == "glass")
+    {
+        Spectrum Kr = params.find_spectrum("Kr", Spectrum(1));
+        Spectrum Kt = params.find_spectrum("Kt", Spectrum(1));
+        float eta = params.find_float("index", 1.5);
+        float u_roughness = params.find_float("uroughness", 0);
+        float v_roughness = params.find_float("vroughness", 0);
+        bool remap_roughness = params.find_bool("remaproughness", true);
+
+        return make_glass_material(Kr, Kt, u_roughness, v_roughness, eta, remap_roughness);
+    }
+
+    error("Unknown material: \"%s\"", name.c_str());
+    return nullptr;
+}
+
 bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrator **integrator)
 {
     Parser parser(path);
@@ -555,11 +593,8 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                 // NOTE: only using "radius" parameter for now.
                 float radius = params.find_float("radius", 1.0);
 
-                // TODO: reduce duplication here; creating a new BSDF per object
                 // TODO FIXME: use bsdf params instead of sphere's params
-                Bsdf *bsdf = nullptr;
-                if (graphics_state.material == "matte")
-                    bsdf = make_matte_material(params.find_spectrum("Kd", Spectrum(0.5, 0.5, 0.5)));
+                Bsdf *bsdf = make_material(graphics_state.material, params);
 
                 Sphere *sphere = new Sphere(transform, inverse(transform), radius);
                 scene->entities.push_back(Entity(sphere, nullptr, bsdf));
@@ -609,11 +644,8 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
                 Mesh *mesh = new Mesh(transform, inverse(transform), data);
 
-                // TODO: reduce duplication here; creating a new BSDF per object
                 // TODO FIXME: use bsdf params instead of trianglemesh's params
-                Bsdf *bsdf = nullptr;
-                if (graphics_state.material == "matte")
-                    bsdf = make_matte_material(params.find_spectrum("Kd", Spectrum(0.5, 0.5, 0.5)));
+                Bsdf *bsdf = make_material(graphics_state.material, params);
 
                 scene->add_mesh(mesh, bsdf);
             }

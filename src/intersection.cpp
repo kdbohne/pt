@@ -8,6 +8,12 @@ Intersection::Intersection(const Point3f &p)
 {
 }
 
+Ray Intersection::spawn_ray(const Vector3f &d) const
+{
+    // TODO: OffsetRayOrigin()?
+    return Ray(p, d, INFINITY, time);
+}
+
 Ray Intersection::spawn_ray_to(const Intersection &p1) const
 {
     // TODO: improve, two sqrt() done here

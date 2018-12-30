@@ -62,14 +62,14 @@ struct Mesh
 
 struct Triangle : public Geometry
 {
-    const Mesh *mesh;
+    Mesh *mesh;
 
     // TODO: reduce memory usage here
     int pi[3];
     int ni[3];
     int uvi[3];
 
-    Triangle(const Transform &object_to_world, const Transform &world_to_object, const Mesh *mesh, const TriangleData &data);
+    Triangle(const Transform &object_to_world, const Transform &world_to_object, Mesh *mesh, const TriangleData &data);
 
     Bounds3f object_bounds() const override;
     Bounds3f world_bounds() const override;

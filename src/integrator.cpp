@@ -15,7 +15,7 @@ Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its
     Spectrum f = its.entity->bsdf->sample_f(its, its.wo, &wi, u, &pdf, type, &sampled_type);
 
     if ((pdf > 0) && !f.is_black() && (abs_dot(wi, its.n) != 0))
-        return f * Li(scene, ray, depth + 1) * abs_dot(wi, its.n) / pdf;
+        return f * Li(scene, its.spawn_ray(wi), depth + 1) * abs_dot(wi, its.n) / pdf;
 
     return Spectrum(0);
 }

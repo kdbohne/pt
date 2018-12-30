@@ -44,6 +44,8 @@ struct Vector3
     Vector3(T s) : x(s), y(s), z(s) {}
     Vector3(T x, T y, T z) : x(x), y(y), z(z) {}
 
+    explicit Vector3(const Normal3<T> &n) : x(n.x), y(n.y), z(n.z) {}
+
     T operator[](int i) const
     {
         assert((i >= 0) && (i <= 2));
@@ -207,6 +209,13 @@ inline void coordinate_system(const Vector3<T> &v0, Vector3<T> *v1, Vector3<T> *
         *v1 = Vector3<T>(0, v0.z, -v0.y) / std::sqrt(v0.y * v0.y + v0.z * v0.z);
 
     *v2 = cross(v0, *v1);
+}
+
+inline Vector3f spherical_direction(float sin_theta, float cos_theta, float phi)
+{
+    return Vector3f(sin_theta * std::cos(phi),
+                    sin_theta * std::sin(phi),
+                    cos_theta);
 }
 
 inline Vector3f spherical_direction(float sin_theta, float cos_theta, float phi,

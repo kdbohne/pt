@@ -21,5 +21,6 @@ struct Intersection
     Intersection() {}
     Intersection(const Point3f &p);
 
+    Ray spawn_ray(const Vector3f &d) const;
     Ray spawn_ray_to(const Intersection &p1) const;
 };

@@ -14,6 +14,9 @@ static constexpr float INV_PI = 0.31830988618379067154;
 static constexpr float PI_OVER_2 = 1.57079632679489661923;
 static constexpr float PI_OVER_4 = 0.78539816339744830961;
 
+// TODO: move to random.h when it is created?
+static const float ONE_MINUS_EPSILON = 0x1.fffffep-1;
+
 inline float radians(float deg)
 {
     return deg * (PI / 180.0f);

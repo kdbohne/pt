@@ -36,6 +36,11 @@ struct Normal3
         return Normal3<T>(x / s, y / s, z / s);
     }
 
+    Normal3<T> operator-() const
+    {
+        return Normal3<T>(-x, -y, -z);
+    }
+
     float length_squared() const
     {
         return (x * x) + (y * y) + (z * z);
@@ -59,4 +64,10 @@ template<typename T>
 inline Normal3<T> normalize(const Normal3<T> &n)
 {
     return n / n.length();
+}
+
+template<typename T>
+inline Normal3<T> face_forward(const Normal3<T> &n, const Vector3f &v)
+{
+    return (dot(n, v) < 0) ? -n : n;
 }

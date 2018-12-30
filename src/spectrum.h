@@ -30,6 +30,15 @@ struct CoefficientSpectrum
         return *this;
     }
 
+    CoefficientSpectrum<N> operator-(const CoefficientSpectrum<N> &s) const
+    {
+        CoefficientSpectrum<N> result = *this;
+        for (int i = 0; i < N; ++i)
+            result.c[i] -= s.c[i];
+
+        return result;
+    }
+
     CoefficientSpectrum<N> operator*(const CoefficientSpectrum<N> &s) const
     {
         CoefficientSpectrum<N> result = *this;
@@ -46,6 +55,14 @@ struct CoefficientSpectrum
             result.c[i] *= s;
 
         return result;
+    }
+
+    CoefficientSpectrum<N> &operator*=(float s)
+    {
+        for (int i = 0; i < N; ++i)
+            c[i] *= s;
+
+        return *this;
     }
 
     CoefficientSpectrum<N> operator/(float s) const

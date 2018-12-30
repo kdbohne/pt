@@ -50,21 +50,24 @@ bool Sphere::intersect(const Ray &ray, Intersection *intersection) const
     if (t > r.tmax)
         return false;
 
-    Point3f hit = r.evaluate(t);
+    Point3f p_hit = r.evaluate(t);
     // TODO: refine hit point
-    if ((hit.x == 0) && (hit.y == 0))
-        hit.x = 1e-5f * radius;
+    if ((p_hit.x == 0) && (p_hit.y == 0))
+        p_hit.x = 1e-5f * radius;
+
+    float phi_max = radians(360); // TODO: configurable?
+    Vector3f dpdu(-phi_max * p_hit.y, phi_max * p_hit.x, 0);
 
     Intersection object_is;
-    object_is.p = hit;
-    object_is.n = normalize(Normal3f(hit));
+    object_is.p = p_hit;
+    object_is.n = normalize(Normal3f(p_hit));
     object_is.wo = -r.d;
 //    object_is.time = r.time;
 //    object_is.uv = ; // TODO FIXME
 //    object_is.dpdu = ; // TODO FIXME
 //    object_is.dpdv = ; // TODO FIXME
-//    object_is.t = ; // TODO FIXME
-//    object_is.b = ; // TODO FIXME
+    object_is.t = normalize(dpdu);
+    object_is.b = cross(object_is.n, object_is.t);
 //    object_is.entity = ; // TODO FIXME
 
     *intersection = object_to_world * object_is;
@@ -150,7 +153,7 @@ Mesh::Mesh(const Transform &object_to_world, const Transform &world_to_object, c
         n = object_to_world * n;
 }
 
-Triangle::Triangle(const Transform &object_to_world, const Transform &world_to_object, const Mesh *mesh, const TriangleData &data)
+Triangle::Triangle(const Transform &object_to_world, const Transform &world_to_object, Mesh *mesh, const TriangleData &data)
     : Geometry(object_to_world, world_to_object), mesh(mesh)
 {
     pi[0] = data.pi[0];
