@@ -91,6 +91,28 @@ struct ParameterList
 
         return default_value;
     }
+
+    const std::vector<int> *find_ints(const std::string &name) const
+    {
+        for (const Parameter<int> &param : ints)
+        {
+            if (param.name == name)
+                return &param.values;
+        }
+
+        return nullptr;
+    }
+
+    const std::vector<Point3f> *find_point3fs(const std::string &name) const
+    {
+        for (const Parameter<Point3f> &param : point3fs)
+        {
+            if (param.name == name)
+                return &param.values;
+        }
+
+        return nullptr;
+    }
 };
 
 struct GraphicsState
@@ -531,12 +553,66 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                 float radius = params.find_float("radius", 1.0);
 
                 // TODO: reduce duplication here; creating a new BSDF per object
+                // TODO FIXME: use bsdf params instead of sphere's params
                 Bsdf *bsdf = nullptr;
                 if (graphics_state.material == "matte")
                     bsdf = make_matte_material(params.find_spectrum("Kd", Spectrum(0.5, 0.5, 0.5)));
 
                 Sphere *sphere = new Sphere(transform, inverse(transform), radius);
                 scene->entities.push_back(Entity(sphere, nullptr, bsdf));
+            }
+            else if (type == "trianglemesh")
+            {
+                MeshData data;
+
+                const std::vector<int> *indices = params.find_ints("indices");
+                if (indices)
+                {
+                    if (indices->size() % 3 != 0)
+                    {
+                        error("Triangle mesh indices list contains incomplete triangle(s): %d indices\n", (int)indices->size());
+                    }
+                    else
+                    {
+                        for (int i = 0; i < (int)indices->size(); i += 3)
+                        {
+                            data.tris.emplace_back();
+                            TriangleData &tri = data.tris.back();
+                            for (int j = 0; j < 3; ++j)
+                            {
+                                tri.pi[j]  = (*indices)[i + j];
+                                tri.ni[j]  = (*indices)[i + j];
+                                tri.uvi[j] = (*indices)[i + j];
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    error("Triangle mesh does not have indices.%s", ""); // TODO FIXME HACK: 0-arg error()
+                }
+
+                const std::vector<Point3f> *positions = params.find_point3fs("P");
+                if (positions)
+                {
+                    // TODO: check positions->size() against maximum index in indices list
+                    for (size_t i = 0; i < positions->size(); ++i)
+                        data.p.push_back((*positions)[i]);
+                }
+                else
+                {
+                    error("Triangle mesh does not have positions.%s", ""); // TODO FIXME HACK: 0-arg error()
+                }
+
+                Mesh *mesh = new Mesh(transform, inverse(transform), data);
+
+                // TODO: reduce duplication here; creating a new BSDF per object
+                // TODO FIXME: use bsdf params instead of trianglemesh's params
+                Bsdf *bsdf = nullptr;
+                if (graphics_state.material == "matte")
+                    bsdf = make_matte_material(params.find_spectrum("Kd", Spectrum(0.5, 0.5, 0.5)));
+
+                scene->add_mesh(mesh, bsdf);
             }
             else
             {
