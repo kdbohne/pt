@@ -11,6 +11,8 @@ struct Point2
     Point2(T x, T y) : x(x), y(y) {}
 
     template<typename U>
+    explicit Point2(const Point2<U> &p) : x((T)p.x), y((T)p.y) {}
+    template<typename U>
     explicit Point2(const Vector2<U> &v) : x((T)v.x), y((T)v.y) {}
 
     template<typename U>

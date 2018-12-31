@@ -76,6 +76,16 @@ struct CoefficientSpectrum
         return result;
     }
 
+    CoefficientSpectrum<N> &operator/=(float s)
+    {
+        assert(s != 0);
+
+        for (int i = 0; i < N; ++i)
+            c[i] /= s;
+
+        return *this;
+    }
+
     bool is_black() const
     {
         for (int i = 0; i < N; ++i)

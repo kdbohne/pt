@@ -6,6 +6,7 @@
 #include "light.h"
 #include "camera.h"
 #include "film.h"
+#include "sampler.h"
 
 Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its, const Ray &ray, int depth, BxdfType type) const
 {
@@ -90,15 +91,24 @@ void WhittedIntegrator::render(const Scene &scene, const Camera &camera) const
     {
         for (int x = 0; x < film->resolution.x; ++x)
         {
-            CameraSample cs;
-            cs.film_pos.x = (float)x / (float)(film->resolution.x - 1);
-            cs.film_pos.y = 1 - (float)y / (float)(film->resolution.y - 1);
-            cs.time = 0; // TODO
+            Spectrum L(0);
 
-            Ray ray;
-            camera.generate_ray(cs, &ray);
+            Point2i pixel(x, y);
+            sampler->start_pixel(pixel);
+            do
+            {
+                CameraSample cs = sampler->get_camera_sample(pixel);
 
-            Spectrum L = Li(scene, ray);
+                Ray ray;
+                camera.generate_ray(cs, &ray);
+
+                L += Li(scene, ray);
+            }
+            while (sampler->start_next_sample());
+
+            // TODO: proper weighting
+            L /= (float)sampler->samples_per_pixel;
+
             film->set_pixel(x, y, L);
         }
     }

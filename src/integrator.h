@@ -3,6 +3,7 @@
 #include "spectrum.h"
 #include "bsdf.h"
 
+struct Sampler;
 struct Scene;
 struct Ray;
 struct Camera;
@@ -10,6 +11,8 @@ struct Intersection;
 
 struct Integrator
 {
+    Sampler *sampler;
+
     virtual Spectrum Li(const Scene &scene, const Ray &ray, int depth = 0) const = 0;
     virtual void render(const Scene &scene, const Camera &camera) const = 0;
 
@@ -21,8 +24,9 @@ struct Integrator
 struct WhittedIntegrator : public Integrator
 {
     int max_depth;
+    Sampler *sampler;
 
-    WhittedIntegrator(int max_depth) : max_depth(max_depth) {}
+    WhittedIntegrator(int max_depth, Sampler *sampler) : max_depth(max_depth), sampler(sampler) {}
 
     Spectrum Li(const Scene &scene, const Ray &ray, int depth = 0) const override;
     void render(const Scene &scene, const Camera &camera) const override;

@@ -8,6 +8,7 @@
 #include "geometry.h"
 #include "scene.h"
 #include "light.h"
+#include "sampler.h"
 
 #include <cstdio>
 
@@ -259,8 +260,6 @@ struct Parser
         std::string name = decl.substr(space + 1);
 
         eat_whitespace();
-
-//        printf("Type: \"%s\", Name: \"%s\"\n", type.c_str(), name.c_str());
 
         // TODO CLEANUP: reduce duplication
         // TODO CLEANUP: reorder types
@@ -515,6 +514,11 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
             ParameterList params;
             parser.parse_parameters(&params);
+
+            // TODO: use specified sampler
+            RandomSampler *sampler = new RandomSampler(16);
+
+            *integrator = new WhittedIntegrator(5, sampler);
         }
         else if (token == "Film")
         {
@@ -681,8 +685,6 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
     Film *film = new Film(film_resolution);
     *camera = new Camera(camera_to_world, camera_fov, film);
-
-    *integrator = new WhittedIntegrator(5);
 
     return true;
 }
