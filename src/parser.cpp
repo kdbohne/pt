@@ -676,6 +676,14 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
             transform = translate(Vector3f(v[0], v[1], v[2])) * transform;
         }
+        else if (token == "Scale")
+        {
+            float v[3];
+            for (int i = 0; i < 3; ++i)
+                v[i] = parser.parse_number();
+
+            transform = scale(v[0], v[1], v[2]) * transform;
+        }
         else
         {
             // TODO: line/column numbers
