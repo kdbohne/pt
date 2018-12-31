@@ -676,6 +676,14 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
             transform = translate(Vector3f(v[0], v[1], v[2])) * transform;
         }
+        else if (token == "Rotate")
+        {
+            float v[4];
+            for (int i = 0; i < 4; ++i)
+                v[i] = parser.parse_number();
+
+            transform = rotate(v[0], Vector3f(v[1], v[2], v[3])) * transform;
+        }
         else if (token == "Scale")
         {
             float v[3];

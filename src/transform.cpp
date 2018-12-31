@@ -1,4 +1,5 @@
 #include "transform.h"
+#include "math.h"
 
 Transform Transform::operator*(const Transform &t) const
 {
@@ -43,6 +44,33 @@ Transform translate(const Vector3f &delta)
                   0, 0, 0, 1);
 
     return Transform(m, inv);
+}
+
+Transform rotate(float angle, const Vector3f &axis)
+{
+    Vector3f a = normalize(axis);
+
+    // TODO: should the angle parameter be specified in radians?
+    float sin_theta = std::sin(radians(angle));
+    float cos_theta = std::cos(radians(angle));
+
+    Matrix4x4 m;
+    m.m[0][0] = a.x * a.x + (1 - a.x * a.x) * cos_theta;
+    m.m[0][1] = a.x * a.y * (1 - cos_theta) - a.z * sin_theta;
+    m.m[0][2] = a.x * a.z * (1 - cos_theta) + a.y * sin_theta;
+    m.m[0][3] = 0;
+
+    m.m[1][0] = a.x * a.y * (1 - cos_theta) + a.z * sin_theta;
+    m.m[1][1] = a.y * a.y + (1 - a.y * a.y) * cos_theta;
+    m.m[1][2] = a.y * a.z * (1 - cos_theta) - a.x * sin_theta;
+    m.m[1][3] = 0;
+
+    m.m[2][0] = a.x * a.z * (1 - cos_theta) - a.y * sin_theta;
+    m.m[2][1] = a.y * a.z * (1 - cos_theta) + a.x * sin_theta;
+    m.m[2][2] = a.z * a.z + (1 - a.z * a.z) * cos_theta;
+    m.m[2][3] = 0;
+
+    return Transform(m, transpose(m));
 }
 
 Transform scale(float x, float y, float z)

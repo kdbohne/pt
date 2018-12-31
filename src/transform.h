@@ -32,6 +32,7 @@ struct Transform
 
 Transform inverse(const Transform &t);
 Transform translate(const Vector3f &delta);
+Transform rotate(float angle, const Vector3f &axis);
 Transform scale(float x, float y, float z);
 
 Transform perspective(float vfov, float aspect, float n, float f);
