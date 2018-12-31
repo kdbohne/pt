@@ -613,7 +613,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                 {
                     if (indices->size() % 3 != 0)
                     {
-                        error("Triangle mesh indices list contains incomplete triangle(s): %d indices\n", (int)indices->size());
+                        error("Triangle mesh indices list contains incomplete triangle(s): %d indices", (int)indices->size());
                     }
                     else
                     {
@@ -656,7 +656,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             }
             else
             {
-                error("Unknown shape type \"%s\"; ignoring.\n", type.c_str());
+                error("Unknown shape type \"%s\"; ignoring.", type.c_str());
             }
         }
         else if (token == "Texture")
@@ -695,7 +695,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         else
         {
             // TODO: line/column numbers
-            fatal("Unknown identifier: \"%.*s\"\n", token.length, token.s);
+            fatal("Unknown identifier: \"%.*s\"", token.length, token.s);
         }
     }
 
