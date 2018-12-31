@@ -410,8 +410,10 @@ struct Parser
         }
     }
 
-    void parse_parameters(ParameterList *params)
+    ParameterList parse_parameters()
     {
+        ParameterList params;
+
         // Parameters are always double-quoted, so continue parsing parameters
         // until a non-quoted token is found.
         while (true)
@@ -419,10 +421,12 @@ struct Parser
             eat_whitespace();
 
             if (*c != '"')
-                return;
+                return params;
 
-            parse_parameter(params);
+            parse_parameter(&params);
         }
+
+        return params;
     }
 };
 
@@ -494,9 +498,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         {
             std::string type = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
-
+            ParameterList params = parser.parse_parameters();
             camera_fov = radians(params.find_float("fov", 90));
         }
         else if (token == "Sampler")
@@ -504,16 +506,14 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             // TODO UNUSED
             std::string type = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
+            ParameterList params = parser.parse_parameters();
         }
         else if (token == "Integrator")
         {
             // TODO UNUSED
             std::string type = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
+            ParameterList params = parser.parse_parameters();
 
             // TODO: use specified sampler
             RandomSampler *sampler = new RandomSampler(16);
@@ -524,9 +524,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         {
             std::string type = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
-
+            ParameterList params = parser.parse_parameters();
             film_resolution.x = params.find_int("xresolution", 640);
             film_resolution.y = params.find_int("yresolution", 480);
         }
@@ -542,8 +540,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         {
             std::string type = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
+            ParameterList params = parser.parse_parameters();
 
             if (type == "point")
             {
@@ -582,15 +579,13 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             graphics_state.material = name;
 
             // TODO FIXME
-            ParameterList params;
-            parser.parse_parameters(&params);
+            ParameterList params = parser.parse_parameters();
         }
         else if (token == "Shape")
         {
             std::string type = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
+            ParameterList params = parser.parse_parameters();
 
             if (type == "sphere")
             {
@@ -665,8 +660,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             std::string type = parser.parse_string();
             std::string class_ = parser.parse_string();
 
-            ParameterList params;
-            parser.parse_parameters(&params);
+            ParameterList params = parser.parse_parameters();
         }
         else if (token == "Translate")
         {
