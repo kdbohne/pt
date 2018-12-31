@@ -321,7 +321,7 @@ struct Parser
             // TODO: does this need to handle arrays?
             param.values.push_back(parse_string());
         }
-        else if (type == "rgb")
+        else if ((type == "rgb") || (type == "color"))
         {
             params->spectrums.emplace_back();
 
