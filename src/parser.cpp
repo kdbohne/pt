@@ -532,7 +532,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         }
         else if (token == "WorldBegin")
         {
-            // TODO: ?
+            transform = Transform();
         }
         else if (token == "WorldEnd")
         {
