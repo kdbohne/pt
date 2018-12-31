@@ -509,22 +509,17 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         }
         else if (token == "Sampler")
         {
-            // TODO UNUSED
+            // TODO FIXME UNUSED
             std::string type = parser.parse_string();
 
             ParameterList params = parser.parse_parameters();
         }
         else if (token == "Integrator")
         {
-            // TODO UNUSED
+            // TODO FIXME UNUSED
             std::string type = parser.parse_string();
 
             ParameterList params = parser.parse_parameters();
-
-            // TODO: use specified sampler
-            RandomSampler *sampler = new RandomSampler(16);
-
-            *integrator = new WhittedIntegrator(5, sampler);
         }
         else if (token == "Film")
         {
@@ -701,6 +696,9 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
     Film *film = new Film(film_resolution);
     *camera = new Camera(camera_to_world, camera_fov, film);
+
+    RandomSampler *sampler = new RandomSampler(4);
+    *integrator = new WhittedIntegrator(5, sampler);
 
     return true;
 }
