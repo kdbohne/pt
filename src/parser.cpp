@@ -275,7 +275,10 @@ struct Parser
                 // TODO: advance()
                 ++c;
                 while (*c != ']')
+                {
                     param.values.push_back(parse_number());
+                    eat_whitespace();
+                }
                 // TODO: advance()
                 ++c;
             }
@@ -296,7 +299,10 @@ struct Parser
                 // TODO: advance()
                 ++c;
                 while (*c != ']')
+                {
                     param.values.push_back(parse_number());
+                    eat_whitespace();
+                }
                 // TODO: advance()
                 ++c;
             }
