@@ -132,6 +132,9 @@ struct GraphicsState
 {
     // TODO: store more state, see GraphicsState in pbrt's api.cpp, line 201
     std::string material;
+
+    std::string area_light_type;
+    ParameterList area_light_params;
 };
 
 static bool is_newline(char c)
@@ -458,8 +461,84 @@ static Bsdf *make_material(const std::string &name, const ParameterList &params)
         return make_glass_material(Kr, Kt, u_roughness, v_roughness, eta, remap_roughness);
     }
 
+    // TODO: line/column numbers
     error("Unknown material: \"%s\"", name.c_str());
     return nullptr;
+}
+
+static std::vector<Geometry *> make_geometries(const std::string &type, const ParameterList &params, const Transform &transform)
+{
+    std::vector<Geometry *> geometries;
+
+    if (type == "sphere")
+    {
+        // NOTE: only using "radius" parameter for now.
+        float radius = params.find_float("radius", 1.0);
+
+        Sphere *sphere = new Sphere(transform, inverse(transform), radius);
+        geometries.push_back(sphere);
+    }
+    else if (type == "trianglemesh")
+    {
+        MeshData data;
+
+        const std::vector<int> *indices = params.find_ints("indices");
+        if (indices)
+        {
+            if (indices->size() % 3 != 0)
+            {
+                // TODO: line/column numbers
+                error("Triangle mesh indices list contains incomplete triangle(s): %d indices", (int)indices->size());
+            }
+            else
+            {
+                for (int i = 0; i < (int)indices->size(); i += 3)
+                {
+                    data.tris.emplace_back();
+                    TriangleData &tri = data.tris.back();
+                    for (int j = 0; j < 3; ++j)
+                    {
+                        tri.pi[j]  = (*indices)[i + j];
+                        tri.ni[j]  = (*indices)[i + j];
+                        tri.uvi[j] = (*indices)[i + j];
+                    }
+                }
+            }
+        }
+        else
+        {
+            // TODO: line/column numbers
+            error("Triangle mesh does not have indices.%s", ""); // TODO FIXME HACK: 0-arg error()
+        }
+
+        const std::vector<Point3f> *positions = params.find_point3fs("P");
+        if (positions)
+        {
+            // TODO: check positions->size() against maximum index in indices list
+            for (size_t i = 0; i < positions->size(); ++i)
+                data.p.push_back((*positions)[i]);
+        }
+        else
+        {
+            // TODO: line/column numbers
+            error("Triangle mesh does not have positions.%s", ""); // TODO FIXME HACK: 0-arg error()
+        }
+
+        Mesh *mesh = new Mesh(transform, inverse(transform), data);
+
+        for (const TriangleData &t : mesh->data.tris)
+        {
+            Triangle *triangle = new Triangle(mesh->object_to_world, mesh->world_to_object, mesh, t);
+            geometries.push_back(triangle);
+        }
+    }
+    else
+    {
+        // TODO: line/column numbers
+        error("Unknown shape type \"%s\"; ignoring.", type.c_str());
+    }
+
+    return geometries;
 }
 
 bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrator **integrator)
@@ -475,6 +554,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
     std::vector<GraphicsState> graphics_states;
     GraphicsState graphics_state;
 
+    std::vector<Transform> transforms;
     Transform transform;
 
     while (true)
@@ -531,6 +611,10 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         }
         else if (token == "WorldBegin")
         {
+            graphics_states.clear();
+            graphics_state = {};
+
+            transforms.clear();
             transform = Transform();
         }
         else if (token == "WorldEnd")
@@ -566,6 +650,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         else if (token == "AttributeBegin")
         {
             graphics_states.push_back(graphics_state);
+            transforms.push_back(transform);
         }
         else if (token == "AttributeEnd")
         {
@@ -573,6 +658,9 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
             graphics_state = graphics_states.back();
             graphics_states.pop_back();
+
+            transform = transforms.back();
+            transforms.pop_back();
         }
         else if (token == "Material")
         {
@@ -585,73 +673,29 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         else if (token == "Shape")
         {
             std::string type = parser.parse_string();
-
             ParameterList params = parser.parse_parameters();
 
-            if (type == "sphere")
-            {
-                // NOTE: only using "radius" parameter for now.
-                float radius = params.find_float("radius", 1.0);
+            std::vector<Geometry *> geometries = make_geometries(type, params, transform);
 
-                // TODO FIXME: use bsdf params instead of sphere's params
+            bool has_area_light = (graphics_state.area_light_type.length() > 0);
+            for (Geometry *geometry : geometries)
+            {
+                AreaLight *area_light = nullptr;
+                if (has_area_light)
+                {
+                    Spectrum L = graphics_state.area_light_params.find_spectrum("L", Spectrum(1, 1, 1));
+                    bool two_sided = graphics_state.area_light_params.find_bool("twosided", false); // TODO UNUSED
+                    int samples_count = graphics_state.area_light_params.find_int("samples", 1);
+
+                    area_light = new DiffuseAreaLight(transform, samples_count, L, geometry);
+                    scene->lights.push_back(area_light);
+                }
+
+                // TODO FIXME: use bsdf params instead of geometry's params
+                // TODO: avoid duplicating BSDF per geometry
                 Bsdf *bsdf = make_material(graphics_state.material, params);
 
-                Sphere *sphere = new Sphere(transform, inverse(transform), radius);
-                scene->entities.push_back(Entity(sphere, nullptr, bsdf));
-            }
-            else if (type == "trianglemesh")
-            {
-                MeshData data;
-
-                const std::vector<int> *indices = params.find_ints("indices");
-                if (indices)
-                {
-                    if (indices->size() % 3 != 0)
-                    {
-                        error("Triangle mesh indices list contains incomplete triangle(s): %d indices", (int)indices->size());
-                    }
-                    else
-                    {
-                        for (int i = 0; i < (int)indices->size(); i += 3)
-                        {
-                            data.tris.emplace_back();
-                            TriangleData &tri = data.tris.back();
-                            for (int j = 0; j < 3; ++j)
-                            {
-                                tri.pi[j]  = (*indices)[i + j];
-                                tri.ni[j]  = (*indices)[i + j];
-                                tri.uvi[j] = (*indices)[i + j];
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    error("Triangle mesh does not have indices.%s", ""); // TODO FIXME HACK: 0-arg error()
-                }
-
-                const std::vector<Point3f> *positions = params.find_point3fs("P");
-                if (positions)
-                {
-                    // TODO: check positions->size() against maximum index in indices list
-                    for (size_t i = 0; i < positions->size(); ++i)
-                        data.p.push_back((*positions)[i]);
-                }
-                else
-                {
-                    error("Triangle mesh does not have positions.%s", ""); // TODO FIXME HACK: 0-arg error()
-                }
-
-                Mesh *mesh = new Mesh(transform, inverse(transform), data);
-
-                // TODO FIXME: use bsdf params instead of trianglemesh's params
-                Bsdf *bsdf = make_material(graphics_state.material, params);
-
-                scene->add_mesh(mesh, bsdf);
-            }
-            else
-            {
-                error("Unknown shape type \"%s\"; ignoring.", type.c_str());
+                scene->entities.push_back(Entity(geometry, area_light, bsdf));
             }
         }
         else if (token == "Texture")
@@ -686,6 +730,28 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                 v[i] = parser.parse_number();
 
             transform = scale(v[0], v[1], v[2]) * transform;
+        }
+        else if (token == "CoordSysTransform")
+        {
+            // TODO FIXME UNUSED
+            std::string name = parser.parse_string();
+        }
+        else if (token == "AreaLightSource")
+        {
+            std::string type = parser.parse_string();
+            ParameterList params = parser.parse_parameters();
+
+            if (type != "diffuse")
+            {
+                type = "";
+                params = ParameterList();
+
+                // TODO: line/column numbers
+                error("Unsupported area light source type \"%s\"; ignoring.", type.c_str());
+            }
+
+            graphics_state.area_light_type = type;
+            graphics_state.area_light_params = params;
         }
         else
         {

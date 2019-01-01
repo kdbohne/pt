@@ -17,5 +17,6 @@ struct Scene
 
     bool intersect(const Ray &ray, Intersection *intersection) const;
 
+    // TODO: remove?
     void add_mesh(Mesh *mesh, Bsdf *bsdf);
 };

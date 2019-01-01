@@ -50,9 +50,10 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
     Vector3f wo = -ray.d;
     Normal3f n = its.n;
 
+    // TODO: clean this up, add Intersection::Le() helper?
     // Hit an area light.
-    if (its.entity->light)
-        L += its.entity->light->Le(wo);
+    if (its.entity->area_light)
+        L += its.entity->area_light->L(its, wo);
 
     // Sum individual light contributions.
     for (const Light *light : scene.lights)

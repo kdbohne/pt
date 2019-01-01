@@ -1,5 +1,6 @@
 #include "geometry.h"
 #include "math.h"
+#include "sampling.h"
 
 #include <fstream>
 #include <sstream>
@@ -14,6 +15,24 @@ Bounds3f Geometry::world_bounds() const
     return object_to_world * object_bounds();
 }
 
+Intersection Geometry::sample(const Intersection &ref, const Point2f &u, float *pdf) const
+{
+    Intersection its = sample(u, pdf);
+
+    Vector3f wi = its.p - ref.p;
+    if (wi.length_squared() == 0)
+    {
+        *pdf = 0;
+    }
+    else
+    {
+        wi = normalize(wi);
+        *pdf *= distance_squared(ref.p, its.p) / abs_dot(its.n, -wi);
+    }
+
+    return its;
+}
+
 Sphere::Sphere(const Transform &object_to_world, const Transform &world_to_object, float radius)
     : Geometry(object_to_world, world_to_object), radius(radius)
 {
@@ -23,6 +42,11 @@ Bounds3f Sphere::object_bounds() const
 {
     return Bounds3f(Point3f(-radius, -radius, -radius),
                     Point3f( radius,  radius,  radius));
+}
+
+float Sphere::area() const
+{
+    return 4 * PI * (radius * radius);
 }
 
 bool Sphere::intersect(const Ray &ray, Intersection *intersection) const
@@ -75,6 +99,58 @@ bool Sphere::intersect(const Ray &ray, Intersection *intersection) const
     ray.tmax = t;
 
     return true;
+}
+
+Intersection Sphere::sample(const Point2f &u, float *pdf) const
+{
+    Point3f obj = Point3f(0, 0, 0) + radius * uniform_sample_sphere(u);
+
+    Intersection its;
+    its.n = normalize(object_to_world * Normal3f(obj));
+
+    // Reproject onto the surface of the sphere.
+    obj *= radius / distance(obj, Point3f(0, 0, 0));
+    its.p = object_to_world * obj;
+
+    *pdf = 1 / area();
+
+    return its;
+}
+
+Intersection Sphere::sample(const Intersection &ref, const Point2f &u, float *pdf) const
+{
+    Point3f center = object_to_world * Point3f(0, 0, 0);
+    Vector3f wc = normalize(center - ref.p);
+    Vector3f wcx, wcy;
+    coordinate_system(wc, &wcx, &wcy);
+
+    // TODO: offset_ray_origin()
+    Point3f origin = ref.p;
+    if (distance_squared(origin, center) <= radius * radius)
+        return sample(u, pdf);
+
+    float sin_theta_max2 = radius * radius / distance_squared(ref.p, center);
+    float cos_theta_max = std::sqrt(std::max((float)0, 1 - sin_theta_max2));
+    float cos_theta = (1 - u[0]) + u[0] * cos_theta_max;
+    float sin_theta = std::sqrt(std::max((float)0, 1 - cos_theta * cos_theta));
+    float phi = u[1] * 2 * PI;
+
+    float dc = distance(ref.p, center);
+    float ds = dc * cos_theta - std::sqrt(std::max((float)0, radius * radius - dc * dc * sin_theta * sin_theta));
+    float cos_alpha = (dc * dc + radius * radius - ds * ds) / (2 * dc * radius);
+    float sin_alpha = std::sqrt(std::max((float)0, 1 - cos_alpha * cos_alpha));
+
+    Vector3f n_obj = spherical_direction(sin_alpha, cos_alpha, phi, -wcx, -wcy, -wc);
+    Vector3f p_obj = radius * n_obj;
+
+    Intersection its;
+    // TODO: reproject
+    its.p = object_to_world * Point3f(p_obj);
+    its.n = object_to_world * Normal3f(n_obj);
+
+    *pdf = uniform_cone_pdf(cos_theta_max);
+
+    return its;
 }
 
 MeshData load_obj(const std::string &path)
@@ -185,6 +261,15 @@ Bounds3f Triangle::world_bounds() const
     const Point3f &p2 = mesh->data.p[pi[2]];
 
     return Union(Bounds3f(p0, p1), p2);
+}
+
+float Triangle::area() const
+{
+    const Point3f &p0 = mesh->data.p[pi[0]];
+    const Point3f &p1 = mesh->data.p[pi[1]];
+    const Point3f &p2 = mesh->data.p[pi[2]];
+
+    return 0.5 * cross(p1 - p0, p2 - p0).length();
 }
 
 bool Triangle::intersect(const Ray &ray, Intersection *intersection) const
@@ -328,6 +413,34 @@ bool Triangle::intersect(const Ray &ray, Intersection *intersection) const
     return true;
 }
 
+Intersection Triangle::sample(const Point2f &u, float *pdf) const
+{
+    Point2f b = uniform_sample_triangle(u);
+
+    const Point3f &p0 = mesh->data.p[pi[0]];
+    const Point3f &p1 = mesh->data.p[pi[1]];
+    const Point3f &p2 = mesh->data.p[pi[2]];
+
+    Intersection its;
+    its.p = b[0] * p0 + b[1] * p1 + (1 - b[0] - b[1]) * p2;
+    if (mesh->data.n.empty())
+    {
+        // TODO: precompute, store in MeshData?
+        its.n = Normal3f(normalize(cross(p1 - p0, p2 - p0)));
+    }
+    else
+    {
+        const Normal3f &n0 = mesh->data.n[ni[0]];
+        const Normal3f &n1 = mesh->data.n[ni[1]];
+        const Normal3f &n2 = mesh->data.n[ni[2]];
+        its.n = b[0] * n0 + b[1] * n1 + (1 - b[0] - b[1]) * n2;
+    }
+
+    *pdf = 1 / area();
+
+    return its;
+}
+
 #if 0
 #include "geometry.h"
 #include "math.h"
@@ -335,24 +448,6 @@ bool Triangle::intersect(const Ray &ray, Intersection *intersection) const
 
 #include <fstream>
 #include <sstream>
-
-Intersection Geometry::sample(const Intersection &ref, const Point2f &u, float *pdf) const
-{
-    Intersection is = sample(u, pdf);
-
-    Vector3f wi = is.p - ref.p;
-    if (wi.length_squared() == 0)
-    {
-        *pdf = 0;
-    }
-    else
-    {
-        wi = normalize(wi);
-        *pdf *= distance_squared(ref.p, is.p) / abs_dot(is.n, -wi);
-    }
-
-    return is;
-}
 
 float Geometry::pdf(const Intersection &ref, const Vector3f &wi) const
 {
@@ -424,58 +519,6 @@ bool Sphere::intersect(const Ray &ray, Intersection *intersection) const
     return true;
 }
 
-Intersection Sphere::sample(const Point2f &u, float *pdf) const
-{
-    Point3f obj = Point3f(0, 0, 0) + radius * uniform_sample_sphere(u);
-
-    Intersection i;
-    i.n = normalize(object_to_world * Normal3f(obj));
-
-    // Reproject onto the surface of the sphere.
-    obj *= radius / distance(obj, Point3f(0, 0, 0));
-    i.p = object_to_world * obj;
-
-    *pdf = 1 / area();
-
-    return i;
-}
-
-Intersection Sphere::sample(const Intersection &ref, const Point2f &u, float *pdf) const
-{
-    Point3f center = object_to_world * Point3f(0, 0, 0);
-    Vector3f wc = normalize(center - ref.p);
-    Vector3f wcx, wcy;
-    coordinate_system(wc, &wcx, &wcy);
-
-    // TODO: offset_ray_origin()
-    Point3f origin = ref.p;
-    if (distance_squared(origin, center) <= radius * radius)
-        return sample(u, pdf);
-
-    float sin_theta_max2 = radius * radius / distance_squared(ref.p, center);
-    float cos_theta_max = std::sqrt(std::max((float)0, 1 - sin_theta_max2));
-    float cos_theta = (1 - u[0]) + u[0] * cos_theta_max;
-    float sin_theta = std::sqrt(std::max((float)0, 1 - cos_theta * cos_theta));
-    float phi = u[1] * 2 * PI;
-
-    float dc = distance(ref.p, center);
-    float ds = dc * cos_theta - std::sqrt(std::max((float)0, radius * radius - dc * dc * sin_theta * sin_theta));
-    float cos_alpha = (dc * dc + radius * radius - ds * ds) / (2 * dc * radius);
-    float sin_alpha = std::sqrt(std::max((float)0, 1 - cos_alpha * cos_alpha));
-
-    Vector3f n_obj = spherical_direction(sin_alpha, cos_alpha, phi, -wcx, -wcy, -wc);
-    Vector3f p_obj = radius * n_obj;
-
-    Intersection i;
-    // TODO: reproject
-    i.p = object_to_world * Point3f(p_obj);
-    i.n = object_to_world * Normal3f(n_obj);
-
-    *pdf = uniform_cone_pdf(cos_theta_max);
-
-    return i;
-}
-
 float Sphere::area() const
 {
     return 4 * PI * (radius * radius);
@@ -492,34 +535,6 @@ float Sphere::pdf(const Intersection &ref, const Vector3f &wi) const
     float sin_theta_max2 = radius * radius / distance_squared(ref.p, center);
     float cos_theta_max = std::sqrt(std::max((float)0, 1 - sin_theta_max2));
     return uniform_cone_pdf(cos_theta_max);
-}
-
-Intersection Triangle::sample(const Point2f &u, float *pdf) const
-{
-    Point2f b = uniform_sample_triangle(u);
-
-    const Point3f &p0 = mesh->data.p[pi[0]];
-    const Point3f &p1 = mesh->data.p[pi[1]];
-    const Point3f &p2 = mesh->data.p[pi[2]];
-
-    Intersection is;
-    is.p = b[0] * p0 + b[1] * p1 + (1 - b[0] - b[1]) * p2;
-    if (mesh->data.n.empty())
-    {
-        // TODO: precompute, store in MeshData?
-        is.n = Normal3f(normalize(cross(p1 - p0, p2 - p0)));
-    }
-    else
-    {
-        const Normal3f &n0 = mesh->data.n[ni[0]];
-        const Normal3f &n1 = mesh->data.n[ni[1]];
-        const Normal3f &n2 = mesh->data.n[ni[2]];
-        is.n = b[0] * n0 + b[1] * n1 + (1 - b[0] - b[1]) * n2;
-    }
-
-    *pdf = 1 / area();
-
-    return is;
 }
 
 float Triangle::area() const

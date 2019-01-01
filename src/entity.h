@@ -5,7 +5,7 @@
 #include "vector.h"
 
 struct Geometry;
-struct Light;
+struct AreaLight;
 struct Bsdf;
 struct Ray;
 struct Intersection;
@@ -13,11 +13,12 @@ struct Intersection;
 struct Entity
 {
     Geometry *geometry;
-    Light *light;
+    AreaLight *area_light;
     Bsdf *bsdf;
 
     Entity() {}
-    Entity(Geometry *g, Light *l, Bsdf *b) : geometry(g), light(l), bsdf(b) {}
+    Entity(Geometry *geometry, AreaLight *light, Bsdf *bsdf)
+        : geometry(geometry), area_light(light), bsdf(bsdf) {}
 
     bool intersect(const Ray &ray, Intersection *intersection) const;
 };

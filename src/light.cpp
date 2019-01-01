@@ -23,7 +23,7 @@ Spectrum Light::Le(const Vector3f &wo) const
 }
 
 PointLight::PointLight(const Transform &light_to_world, const Spectrum &I)
-    : p(light_to_world * Point3f(0, 0, 0)), I(I)
+    : Light(light_to_world), p(light_to_world * Point3f(0, 0, 0)), I(I)
 {
 }
 
@@ -40,11 +40,6 @@ Spectrum PointLight::sample_Li(const Intersection &ref, const Point2f &u, Vector
 Spectrum PointLight::power() const
 {
     return 4 * PI * I;
-}
-
-DirectionalLight::DirectionalLight(const Transform &light_to_world, const Spectrum &L, const Vector3f &w)
-    : L(L), w_light(normalize(light_to_world * w))
-{
 }
 
 void DirectionalLight::preprocess(const Scene &scene)
@@ -72,4 +67,31 @@ Spectrum DirectionalLight::sample_Li(const Intersection &ref, const Point2f &u, 
 Spectrum DirectionalLight::power() const
 {
     return L * PI * world_radius * world_radius;
+}
+
+Spectrum DiffuseAreaLight::L(const Intersection &its, const Vector3f &w) const
+{
+    // TODO: two-sided option
+    return (dot(its.n, w) > 0) ? Lemit : Spectrum(0);
+}
+
+Spectrum DiffuseAreaLight::sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const
+{
+    Intersection p_shape = geometry->sample(ref, u, pdf);
+    if ((*pdf == 0) || ((p_shape.p - ref.p).length_squared() == 0))
+    {
+        *pdf = 0;
+        return Spectrum(0);
+    }
+
+    *wi = normalize(p_shape.p - ref.p);
+    *vis = VisibilityTest(ref, p_shape);
+
+    return L(p_shape, -(*wi));
+}
+
+Spectrum DiffuseAreaLight::power() const
+{
+    // TODO: two-sided option
+    return Lemit * area * PI;
 }

@@ -4,9 +4,10 @@
 #include "spectrum.h"
 #include "vector.h"
 #include "point.h"
+#include "transform.h"
+#include "geometry.h"
 
 struct Scene;
-struct Transform;
 
 class VisibilityTest
 {
@@ -22,6 +23,12 @@ private:
 
 struct Light
 {
+    Transform light_to_world;
+    int samples_count;
+
+    Light(Transform light_to_world, int samples_count = 1)
+        : light_to_world(light_to_world), samples_count(samples_count) {}
+
     virtual void preprocess(const Scene &scene) {}
 
     virtual Spectrum Le(const Vector3f &wo) const;
@@ -48,9 +55,32 @@ struct DirectionalLight : public Light
     Point3f world_center;
     float world_radius;
 
-    DirectionalLight(const Transform &light_to_world, const Spectrum &L, const Vector3f &w);
+    DirectionalLight(const Transform &light_to_world, const Spectrum &L, const Vector3f &w)
+        : Light(light_to_world), L(L), w_light(normalize(light_to_world * w)) {}
 
     void preprocess(const Scene &scene) override;
+
+    Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const override;
+    Spectrum power() const override;
+};
+
+struct AreaLight : public Light
+{
+    AreaLight(const Transform &light_to_world, int samples_count) : Light(light_to_world, samples_count) {}
+
+    virtual Spectrum L(const Intersection &its, const Vector3f &w) const = 0;
+};
+
+struct DiffuseAreaLight : public AreaLight
+{
+    Spectrum Lemit;
+    Geometry *geometry; // TODO: move to AreaLight?
+    float area;
+
+    DiffuseAreaLight(const Transform &light_to_world, int samples_count, const Spectrum &Lemit, Geometry *geometry)
+        : AreaLight(light_to_world, samples_count), Lemit(Lemit), geometry(geometry), area(geometry->area()) {}
+
+    Spectrum L(const Intersection &its, const Vector3f &w) const override;
 
     Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const override;
     Spectrum power() const override;
