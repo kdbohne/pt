@@ -230,7 +230,7 @@ struct Parser
 
         if (*c != '"')
         {
-            // TODO: line/column numbers
+            // TODO: file/line/column info
             fatal("Expected quoted string; received \"%c\" instead.", *c);
             return "";
         }
@@ -314,6 +314,44 @@ struct Parser
                 param.values.push_back(parse_number());
             }
         }
+        else if (type == "bool")
+        {
+            params->bools.emplace_back();
+
+            Parameter<bool> &param = params->bools.back();
+            param.name = name;
+
+            // TODO CLEANUP: reduce duplication
+            if (*c == '[')
+            {
+                // TODO: advance()
+                ++c;
+                while (*c != ']')
+                {
+                    std::string string = parse_string();
+                    if (string == "true")
+                        param.values.push_back(true);
+                    else if (string == "false")
+                        param.values.push_back(false);
+                    else
+                        error("Invalid boolean value: \"%s\"", string.c_str()); // TODO: file/line/column info
+
+                    eat_whitespace();
+                }
+                // TODO: advance()
+                ++c;
+            }
+            else
+            {
+                std::string string = parse_string();
+                if (string == "true")
+                    param.values.push_back(true);
+                else if (string == "false")
+                    param.values.push_back(false);
+                else
+                    error("Invalid boolean value: \"%s\"", string.c_str()); // TODO: file/line/column info
+            }
+        }
         else if (type == "string")
         {
             params->strings.emplace_back();
@@ -321,8 +359,22 @@ struct Parser
             Parameter<std::string> &param = params->strings.back();
             param.name = name;
 
-            // TODO: does this need to handle arrays?
-            param.values.push_back(parse_string());
+            if (*c == '[')
+            {
+                // TODO: advance()
+                ++c;
+                while (*c != ']')
+                {
+                    param.values.push_back(parse_string());
+                    eat_whitespace();
+                }
+                // TODO: advance()
+                ++c;
+            }
+            else
+            {
+                param.values.push_back(parse_string());
+            }
         }
         else if ((type == "rgb") || (type == "color"))
         {
@@ -414,7 +466,7 @@ struct Parser
         }
         else
         {
-            // TODO: line/column numbers
+            // TODO: file/line/column info
             fatal("Unknown parameter type: \"%s\"", type.c_str());
         }
     }
@@ -461,7 +513,7 @@ static Bsdf *make_material(const std::string &name, const ParameterList &params)
         return make_glass_material(Kr, Kt, u_roughness, v_roughness, eta, remap_roughness);
     }
 
-    // TODO: line/column numbers
+    // TODO: file/line/column info
     error("Unknown material: \"%s\"", name.c_str());
     return nullptr;
 }
@@ -487,7 +539,7 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
         {
             if (indices->size() % 3 != 0)
             {
-                // TODO: line/column numbers
+                // TODO: file/line/column info
                 error("Triangle mesh indices list contains incomplete triangle(s): %d indices", (int)indices->size());
             }
             else
@@ -507,7 +559,7 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
         }
         else
         {
-            // TODO: line/column numbers
+            // TODO: file/line/column info
             error("Triangle mesh does not have indices.%s", ""); // TODO FIXME HACK: 0-arg error()
         }
 
@@ -520,7 +572,7 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
         }
         else
         {
-            // TODO: line/column numbers
+            // TODO: file/line/column info
             error("Triangle mesh does not have positions.%s", ""); // TODO FIXME HACK: 0-arg error()
         }
 
@@ -534,7 +586,7 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
     }
     else
     {
-        // TODO: line/column numbers
+        // TODO: file/line/column info
         error("Unknown shape type \"%s\"; ignoring.", type.c_str());
     }
 
@@ -643,7 +695,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             }
             else
             {
-                // TODO: line/column numbers
+                // TODO: file/line/column info
                 error("Unknown light source type \"%s\"; ignoring.", type.c_str());
             }
         }
@@ -746,7 +798,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                 type = "";
                 params = ParameterList();
 
-                // TODO: line/column numbers
+                // TODO: file/line/column info
                 error("Unsupported area light source type \"%s\"; ignoring.", type.c_str());
             }
 
@@ -755,7 +807,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         }
         else
         {
-            // TODO: line/column numbers
+            // TODO: file/line/column info
             fatal("Unknown identifier: \"%.*s\"", token.length, token.s);
         }
     }
