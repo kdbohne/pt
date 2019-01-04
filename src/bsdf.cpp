@@ -199,7 +199,7 @@ Bsdf *make_matte_material(const Spectrum &Kd)
     return bsdf;
 }
 
-Bsdf *make_plastic_material(const Spectrum &Kd, const Spectrum &Ks, float roughness)
+Bsdf *make_plastic_material(const Spectrum &Kd, const Spectrum &Ks, float roughness, bool remap_roughness)
 {
     Bsdf *bsdf = new Bsdf();
 
@@ -208,6 +208,9 @@ Bsdf *make_plastic_material(const Spectrum &Kd, const Spectrum &Ks, float roughn
 
     if (!Ks.is_black())
     {
+        if (remap_roughness)
+            roughness = TrowbridgeReitzDistribution::roughness_to_alpha(roughness);
+
         MicrofacetDistribution *distribution = new TrowbridgeReitzDistribution(roughness, roughness);
         Fresnel *fresnel = new FresnelDielectric(1, 1.5);
         MicrofacetReflection *specular = new MicrofacetReflection(Ks, distribution, fresnel);
