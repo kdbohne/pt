@@ -515,6 +515,16 @@ static Bsdf *make_material(const std::string &name, const ParameterList &params)
         return make_matte_material(Kd);
     }
 
+    if (name == "plastic")
+    {
+        Spectrum Kd = params.find_spectrum("Kd", Spectrum(0.25));
+        Spectrum Ks = params.find_spectrum("Ks", Spectrum(0.25));
+        float roughness = params.find_float("roughness", 0.1);
+        bool remap_roughness = params.find_bool("remaproughness", true);
+
+        return make_plastic_material(Kd, Ks, roughness, remap_roughness);
+    }
+
     if (name == "glass")
     {
         Spectrum Kr = params.find_spectrum("Kr", Spectrum(1));
