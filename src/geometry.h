@@ -58,6 +58,7 @@ struct MeshData
 };
 
 MeshData load_obj(const std::string &path);
+MeshData load_ply(const std::string &path);
 
 struct Mesh
 {

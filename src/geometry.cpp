@@ -159,7 +159,10 @@ MeshData load_obj(const std::string &path)
 
     std::ifstream file(path);
     if (!file)
+    {
         error("Failed to load OBJ file: %s", path.c_str());
+        return mesh;
+    }
 
     std::string line;
     while (std::getline(file, line))
@@ -213,6 +216,182 @@ MeshData load_obj(const std::string &path)
                 t.ni[i] = ni - 1;
                 t.uvi[i] = uvi - 1;
             }
+            mesh.tris.push_back(t);
+        }
+    }
+
+    return mesh;
+}
+
+static bool starts_with(const std::string &s, const char *match)
+{
+    // TODO: improve?
+    return (s.substr(0, std::string(match).length()) == match);
+}
+
+// TODO SPEED: this could be optimized
+MeshData load_ply(const std::string &path)
+{
+    MeshData mesh;
+
+    std::ifstream file(path);
+    if (!file)
+    {
+        error("Failed to load PLY file: %s", path.c_str());
+        return mesh;
+    }
+
+    std::string line;
+    std::getline(file, line);
+    if (line != "ply")
+    {
+        error("Not a valid PLY file: %s", path.c_str());
+        return mesh;
+    }
+
+    // TODO: actually use format
+    std::getline(file, line);
+    if (line == "format ascii 1.0")
+    {
+        // TODO FIXME
+        error("ASCII PLY format is not supported: %s", path.c_str());
+        return mesh;
+    }
+    else if (line == "format binary_little_endian 1.0")
+    {
+        // TODO FIXME
+    }
+    else if (line == "format binary_big_endian 1.0")
+    {
+        // TODO FIXME
+        error("Big-endian PLY format is not supported: %s", path.c_str());
+        return mesh;
+    }
+
+    int vertex_count = 0;
+    int face_count = 0;
+
+    bool has_positions = false;
+    bool has_normals = false;
+    bool has_uvs = false;
+    bool has_indices = false;
+
+    // TODO SPEED: this could be optimized
+    while (std::getline(file, line))
+    {
+        if (line == "end_header")
+            break;
+
+        if (starts_with(line, "comment"))
+            continue;
+
+        if (starts_with(line, "element vertex"))
+        {
+            std::istringstream ss(line.substr(15));
+            ss >> vertex_count;
+
+            mesh.p.reserve(vertex_count);
+        }
+        else if (starts_with(line, "element face"))
+        {
+            std::istringstream ss(line.substr(13));
+            ss >> face_count;
+
+            mesh.tris.reserve(face_count);
+        }
+        else if (starts_with(line, "property float x") || (starts_with(line, "property float y")) || starts_with(line, "property float z"))
+        {
+            has_positions = true;
+        }
+        else if (starts_with(line, "property float nx") || (starts_with(line, "property float ny")) || starts_with(line, "property float nz"))
+        {
+            has_normals = true;
+        }
+        else if (starts_with(line, "property float u") || (starts_with(line, "property float v")))
+        {
+            has_uvs = true;
+        }
+        else if (starts_with(line, "property list uchar int vertex_indices") || starts_with(line, "property list uint8 int vertex_indices"))
+        {
+            has_indices = true;
+        }
+    }
+
+    if (!has_positions)
+    {
+        error("PLY mesh does not have position data: %s", path.c_str());
+        return mesh;
+    }
+
+    // TODO: just treat as an unindexed mesh?
+    if (!has_indices)
+    {
+        error("PLY mesh does not have index data: %s", path.c_str());
+        return mesh;
+    }
+
+    if (has_positions)
+    {
+        for (int i = 0; i < vertex_count; ++i)
+        {
+            float x, y, z;
+            file.read((char *)&x, 4);
+            file.read((char *)&y, 4);
+            file.read((char *)&z, 4);
+
+            mesh.p.push_back(Point3f(x, y, z));
+        }
+    }
+
+    if (has_normals)
+    {
+        for (int i = 0; i < vertex_count; ++i)
+        {
+            float nx, ny, nz;
+            file.read((char *)&nx, 4);
+            file.read((char *)&ny, 4);
+            file.read((char *)&nz, 4);
+
+            mesh.n.push_back(Normal3f(nx, ny, nz));
+        }
+    }
+
+    if (has_uvs)
+    {
+        for (int i = 0; i < vertex_count; ++i)
+        {
+            float u, v;
+            file.read((char *)&u, 4);
+            file.read((char *)&v, 4);
+
+            mesh.uv.push_back(Point2f(u, v));
+        }
+    }
+
+    if (has_indices)
+    {
+        for (int i = 0; i < face_count; ++i)
+        {
+            TriangleData t;
+
+            uint8_t count;
+            file.read((char *)&count, 1);
+            if (count != 3)
+            {
+                error("Non-triangle faces are not supported: %s\n", path.c_str());
+                break; // TODO: what to do here?
+            }
+
+            int indices[3];
+            for (int j = 0; j < count; ++j)
+            {
+                file.read((char *)&indices[j], 4);
+
+                t.pi[j] = indices[j];
+                t.ni[j] = indices[j];
+                t.uvi[j] = indices[j];
+            }
+
             mesh.tris.push_back(t);
         }
     }

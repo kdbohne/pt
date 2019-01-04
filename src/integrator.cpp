@@ -46,6 +46,15 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
         return Spectrum(0);
     }
 
+#if 1
+    if (!its.entity->bsdf)
+        return Spectrum(0);
+#else
+    // TODO: fix this
+    if (!its.entity->bsdf)
+        return Li(scene, its.spawn_ray(ray.d), depth);
+#endif
+
     // TODO: does this ever change?
     Vector3f wo = -ray.d;
     Normal3f n = its.n;

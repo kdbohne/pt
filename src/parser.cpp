@@ -12,6 +12,9 @@
 
 #include <cstdio>
 
+// The directory of the input path passed to parse_pbrt().
+static std::string input_directory;
+
 struct Token
 {
     const char *s;
@@ -75,6 +78,17 @@ struct ParameterList
     bool find_bool(const std::string &name, bool default_value) const
     {
         for (const Parameter<bool> &param : bools)
+        {
+            if ((param.name == name) && (param.values.size() == 1))
+                return param.values[0];
+        }
+
+        return default_value;
+    }
+
+    std::string find_string(const std::string &name, const std::string &default_value) const
+    {
+        for (const Parameter<std::string> &param : strings)
         {
             if ((param.name == name) && (param.values.size() == 1))
                 return param.values[0];
@@ -584,6 +598,21 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
             geometries.push_back(triangle);
         }
     }
+    else if (type == "plymesh")
+    {
+        // TODO: alpha/shadowalpha texture parameters
+        std::string filename = params.find_string("filename", "");
+
+        MeshData data = load_ply(input_directory + "/" + filename);
+
+        Mesh *mesh = new Mesh(transform, inverse(transform), data);
+
+        for (const TriangleData &t : mesh->data.tris)
+        {
+            Triangle *triangle = new Triangle(mesh->object_to_world, mesh->world_to_object, mesh, t);
+            geometries.push_back(triangle);
+        }
+    }
     else
     {
         // TODO: file/line/column info
@@ -595,6 +624,12 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
 
 bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrator **integrator)
 {
+    size_t last_slash = path.find_last_of('/');
+    if (last_slash == std::string::npos)
+        input_directory = path;
+    else
+        input_directory = path.substr(0, last_slash);
+
     Parser parser(path);
     if (!parser.c)
         return false;
