@@ -161,52 +161,83 @@ static bool is_whitespace(char c)
     return (c == ' ') || (c == '\t') || is_newline(c);
 }
 
-struct Parser
+static std::string read_file(const std::string &path)
+{
+    std::string source;
+
+    FILE *file = std::fopen(path.c_str(), "r");
+    if (!file)
+    {
+        error("Failed to open file: %s", path.c_str());
+        return source;
+    }
+
+    std::fseek(file, 0, SEEK_END);
+    int length = std::ftell(file);
+    std::fseek(file, 0, SEEK_SET);
+
+    source.resize(length);
+
+    if (std::fread(&source[0], length, 1, file) != 1)
+        fatal("Failed to read file: %s", path.c_str());
+
+    std::fclose(file);
+
+    return source;
+}
+
+struct File
 {
     std::string source;
     char *c;
+};
+
+struct Parser
+{
+    std::vector<File> file_stack;
 
     Parser(const std::string &path)
     {
-        FILE *file = std::fopen(path.c_str(), "r");
-        if (!file)
-        {
-            error("Failed to open file: %s", path.c_str());
-            c = nullptr;
+        include(path);
+    }
 
-            return;
-        }
+    void include(const std::string &path)
+    {
+        file_stack.emplace_back();
 
-        std::fseek(file, 0, SEEK_END);
-        int length = std::ftell(file);
-        std::fseek(file, 0, SEEK_SET);
+        File &file = file_stack.back();
+        file.source = read_file(path);
+        file.c = &file.source[0];
+    }
 
-        source.resize(length);
+    char *c()
+    {
+        assert(!file_stack.empty());
+        return file_stack.back().c;
+    }
 
-        if (std::fread(&source[0], length, 1, file) != 1)
-            fatal("Failed to read file: %s", path.c_str());
+    void advance()
+    {
+        assert(!file_stack.empty());
 
-        std::fclose(file);
-
-        c = &source[0];
+        // TODO: column/line numbers
+        ++file_stack.back().c;
     }
 
     void eat_whitespace()
     {
         while (true)
         {
-            if (is_whitespace(*c))
+            if (is_whitespace(*c()))
             {
-                // TODO: advance()
-                ++c;
+                advance();
             }
-            else if (*c == '#')
+            else if (*c() == '#')
             {
-                while (!is_newline(*c))
-                    ++c; // TODO: advance()
+                while (!is_newline(*c()))
+                    advance();
 
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -219,14 +250,14 @@ struct Parser
     {
         eat_whitespace();
 
-        const char *start = c;
+        const char *start = c();
 
-        while (!is_whitespace(*c))
-            ++c; // TODO: advance()
+        while (*c() && !is_whitespace(*c()))
+            advance();
 
         Token token;
         token.s = start;
-        token.length = c - token.s;
+        token.length = c() - token.s;
 
         return token;
     }
@@ -235,33 +266,31 @@ struct Parser
     {
         // TODO: robustness?
         eat_whitespace();
-        return std::strtod(c, &c);
+        return std::strtod(c(), &file_stack.back().c);
     }
 
     std::string parse_string()
     {
         eat_whitespace();
 
-        if (*c != '"')
+        if (*c() != '"')
         {
             // TODO: file/line/column info
-            fatal("Expected quoted string; received \"%c\" instead.", *c);
+            fatal("Expected quoted string; received \"%c\" instead.", *c());
             return "";
         }
 
-        // TODO: advance()
-        ++c;
+        advance();
 
-        const char *start = c;
+        const char *start = c();
 
         // TODO: handle escapes
-        while (*c != '"')
-            ++c; // TODO: advance()
+        while (*c() != '"')
+            advance();
 
-        const char *end = c;
+        const char *end = c();
 
-        // TODO: advance()
-        ++c;
+        advance();
 
         return std::string(start, end - start);
     }
@@ -287,17 +316,15 @@ struct Parser
             Parameter<int> &param = params->ints.back();
             param.name = name;
 
-            if (*c == '[')
+            if (*c() == '[')
             {
-                // TODO: advance()
-                ++c;
-                while (*c != ']')
+                advance();
+                while (*c() != ']')
                 {
                     param.values.push_back(parse_number());
                     eat_whitespace();
                 }
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -311,17 +338,15 @@ struct Parser
             Parameter<float> &param = params->floats.back();
             param.name = name;
 
-            if (*c == '[')
+            if (*c() == '[')
             {
-                // TODO: advance()
-                ++c;
-                while (*c != ']')
+                advance();
+                while (*c() != ']')
                 {
                     param.values.push_back(parse_number());
                     eat_whitespace();
                 }
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -336,11 +361,10 @@ struct Parser
             param.name = name;
 
             // TODO CLEANUP: reduce duplication
-            if (*c == '[')
+            if (*c() == '[')
             {
-                // TODO: advance()
-                ++c;
-                while (*c != ']')
+                advance();
+                while (*c() != ']')
                 {
                     std::string string = parse_string();
                     if (string == "true")
@@ -352,8 +376,7 @@ struct Parser
 
                     eat_whitespace();
                 }
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -373,17 +396,15 @@ struct Parser
             Parameter<std::string> &param = params->strings.back();
             param.name = name;
 
-            if (*c == '[')
+            if (*c() == '[')
             {
-                // TODO: advance()
-                ++c;
-                while (*c != ']')
+                advance();
+                while (*c() != ']')
                 {
                     param.values.push_back(parse_string());
                     eat_whitespace();
                 }
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -397,11 +418,10 @@ struct Parser
             Parameter<Spectrum> &param = params->spectrums.back();
             param.name = name;
 
-            if (*c == '[')
+            if (*c() == '[')
             {
-                // TODO: advance()
-                ++c;
-                while (*c != ']')
+                advance();
+                while (*c() != ']')
                 {
                     float r = parse_number();
                     float g = parse_number();
@@ -410,8 +430,7 @@ struct Parser
 
                     eat_whitespace();
                 }
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -429,11 +448,10 @@ struct Parser
             Parameter<Point3f> &param = params->point3fs.back();
             param.name = name;
 
-            if (*c == '[')
+            if (*c() == '[')
             {
-                // TODO: advance()
-                ++c;
-                while (*c != ']')
+                advance();
+                while (*c() != ']')
                 {
                     float x = parse_number();
                     float y = parse_number();
@@ -442,8 +460,7 @@ struct Parser
 
                     eat_whitespace();
                 }
-                // TODO: advance()
-                ++c;
+                advance();
             }
             else
             {
@@ -461,10 +478,10 @@ struct Parser
             param.name = name;
 
             // TODO: does this need to handle arrays?
-            ++c; // TODO: advance()
+            advance();
             float temperature = parse_number();
             float scale = parse_number();
-            ++c; // TODO: advance()
+            advance();
             // TODO FIXME: convert blackbody emitter values to Spectrumb
 //            param.values.push_back(Spectrum());
         }
@@ -495,7 +512,7 @@ struct Parser
         {
             eat_whitespace();
 
-            if (*c != '"')
+            if (*c() != '"')
                 return params;
 
             parse_parameter(&params);
@@ -641,7 +658,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         input_directory = path.substr(0, last_slash);
 
     Parser parser(path);
-    if (!parser.c)
+    if (!parser.c())
         return false;
 
     Transform camera_to_world;
@@ -657,8 +674,14 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
     while (true)
     {
         Token token = parser.next();
-        if (token.length == 0)
-            break;
+        while (token.length == 0)
+        {
+            if (parser.file_stack.empty())
+                break;
+
+            parser.file_stack.pop_back();
+            token = parser.next();
+        }
 
         // TODO SPEED: switch on first character of token
         // TODO CLEANUP: reorder/alphabetize
@@ -727,6 +750,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             if (type == "point")
             {
                 // TODO FIXME
+                assert(false);
             }
             else if (type == "distant")
             {
@@ -751,11 +775,11 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         }
         else if (token == "AttributeEnd")
         {
-            assert(graphics_states.size() > 0);
-
+            assert(!graphics_states.empty());
             graphics_state = graphics_states.back();
             graphics_states.pop_back();
 
+            assert(!transforms.empty());
             transform = transforms.back();
             transforms.pop_back();
         }
@@ -849,6 +873,13 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
             graphics_state.area_light_type = type;
             graphics_state.area_light_params = params;
+        }
+        else if (token == "Include")
+        {
+            std::string relative_path = parser.parse_string();
+            std::string absolute_path = input_directory + "/" + relative_path;
+
+            parser.include(absolute_path);
         }
         else
         {
