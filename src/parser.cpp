@@ -640,6 +640,65 @@ static std::vector<Geometry *> make_geometries(const std::string &type, const Pa
             geometries.push_back(triangle);
         }
     }
+    else if (type == "loopsubdiv")
+    {
+        MeshData data;
+
+        // TODO FIXME UNUSED: currently just using the given position data
+        // without doing any Loop subdivision
+        int levels = params.find_int("nlevels", 3);
+
+        // TODO CLEANUP: this is copy/pasted from the trianglemesh case
+        const std::vector<int> *indices = params.find_ints("indices");
+        if (indices)
+        {
+            if (indices->size() % 3 != 0)
+            {
+                // TODO: file/line/column info
+                error("Loop subdivision surface indices list contains incomplete triangle(s): %d indices", (int)indices->size());
+            }
+            else
+            {
+                for (int i = 0; i < (int)indices->size(); i += 3)
+                {
+                    data.tris.emplace_back();
+                    TriangleData &tri = data.tris.back();
+                    for (int j = 0; j < 3; ++j)
+                    {
+                        tri.pi[j]  = (*indices)[i + j];
+                        tri.ni[j]  = (*indices)[i + j];
+                        tri.uvi[j] = (*indices)[i + j];
+                    }
+                }
+            }
+        }
+        else
+        {
+            // TODO: file/line/column info
+            error("Loop subdivision surface does not have indices.%s", ""); // TODO FIXME HACK: 0-arg error()
+        }
+
+        const std::vector<Point3f> *positions = params.find_point3fs("P");
+        if (positions)
+        {
+            // TODO: check positions->size() against maximum index in indices list
+            for (size_t i = 0; i < positions->size(); ++i)
+                data.p.push_back((*positions)[i]);
+        }
+        else
+        {
+            // TODO: file/line/column info
+            error("Loop subdivision surface does not have positions.%s", ""); // TODO FIXME HACK: 0-arg error()
+        }
+
+        Mesh *mesh = new Mesh(transform, inverse(transform), data);
+
+        for (const TriangleData &t : mesh->data.tris)
+        {
+            Triangle *triangle = new Triangle(mesh->object_to_world, mesh->world_to_object, mesh, t);
+            geometries.push_back(triangle);
+        }
+    }
     else
     {
         // TODO: file/line/column info
