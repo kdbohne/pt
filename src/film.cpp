@@ -25,6 +25,13 @@ static void tone_map_reinhard(float *rgb)
     rgb[2] /= 1 + rgb[2];
 }
 
+static void accurate_linear_to_srgb(float *linear)
+{
+    linear[0] = (linear[0] <= 0.0031308) ? linear[0] * 12.92 : (std::pow(std::abs(linear[0]), 1.0 / 2.4) * 1.055) - 0.055;
+    linear[1] = (linear[1] <= 0.0031308) ? linear[1] * 12.92 : (std::pow(std::abs(linear[1]), 1.0 / 2.4) * 1.055) - 0.055;
+    linear[2] = (linear[2] <= 0.0031308) ? linear[2] * 12.92 : (std::pow(std::abs(linear[2]), 1.0 / 2.4) * 1.055) - 0.055;
+}
+
 void Film::write_ppm(const std::string &path) const
 {
     std::ofstream file(path);
@@ -43,6 +50,8 @@ void Film::write_ppm(const std::string &path) const
             xyz_to_rgb(p->xyz, rgb);
 
             tone_map_reinhard(rgb);
+
+            accurate_linear_to_srgb(rgb);
 
             int r = (int)(rgb[0] * 255);
             int g = (int)(rgb[1] * 255);
