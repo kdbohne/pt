@@ -20,8 +20,10 @@ Intersection Transform::operator*(const Intersection &is) const
     Intersection result = is;
     // TODO: handle error
     result.p = (*this) * result.p;
-    result.n = (*this) * result.n;
-//    result.wo = (*this) * result.wo;
+    result.n = normalize((*this) * result.n);
+    result.wo = normalize((*this) * result.wo);
+    result.t = normalize((*this) * result.t);
+    result.b = normalize((*this) * result.b);
 
     return result;
 }
