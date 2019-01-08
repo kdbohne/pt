@@ -49,9 +49,9 @@ Matrix4x4 Matrix4x4::operator*(const Matrix4x4 &mat) const
         for (int j = 0; j < 4; ++j)
         {
             r.m[i][j] = m[0][j] * mat.m[i][0] +
-                m[1][j] * mat.m[i][1] +
-                m[2][j] * mat.m[i][2] +
-                m[3][j] * mat.m[i][3];
+                        m[1][j] * mat.m[i][1] +
+                        m[2][j] * mat.m[i][2] +
+                        m[3][j] * mat.m[i][3];
         }
     }
     return r;
@@ -86,7 +86,7 @@ Matrix4x4 inverse(const Matrix4x4 &m)
                             icol = k;
                         }
                     } else if (ipiv[k] > 1)
-                        error("Singular matrix in MatrixInvert%s", "");
+                        error("Singular matrix in MatrixInvert%s", ""); // TODO HACK: 0-arg error
                 }
             }
         }
@@ -97,7 +97,7 @@ Matrix4x4 inverse(const Matrix4x4 &m)
         }
         indxr[i] = irow;
         indxc[i] = icol;
-        if (minv[icol][icol] == 0.f) error("Singular matrix in MatrixInvert%s", "");
+        if (minv[icol][icol] == 0.f) error("Singular matrix in MatrixInvert%s", ""); // TODO HACK: 0-arg error
 
         // Set $m[icol][icol]$ to one by scaling row _icol_ appropriately
         float pivinv = 1. / minv[icol][icol];

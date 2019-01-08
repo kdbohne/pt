@@ -757,7 +757,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             // Convert from a left-handed to a right-handed coordinate system.
             Transform pbrt_to_pt = scale(-1, 1, 1);
 
-            camera_to_world = look_at(eye, target, up) * pbrt_to_pt;
+            camera_to_world = pbrt_to_pt * look_at(eye, target, up);
         }
         else if (token == "Camera")
         {
@@ -893,7 +893,9 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             for (int i = 0; i < 3; ++i)
                 v[i] = parser.parse_number();
 
-            transform = translate(Vector3f(v[0], v[1], v[2])) * transform;
+            // TODO: why are we right-multiplying here?
+            transform = transform * translate(Vector3f(v[0], v[1], v[2]));
+//            transform = translate(Vector3f(v[0], v[1], v[2])) * transform;
         }
         else if (token == "Rotate")
         {
@@ -901,7 +903,9 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             for (int i = 0; i < 4; ++i)
                 v[i] = parser.parse_number();
 
-            transform = rotate(v[0], Vector3f(v[1], v[2], v[3])) * transform;
+            // TODO: why are we right-multiplying here?
+            transform = transform * rotate(v[0], Vector3f(v[1], v[2], v[3]));
+//            transform = rotate(v[0], Vector3f(v[1], v[2], v[3])) * transform;
         }
         else if (token == "Scale")
         {
@@ -909,7 +913,9 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             for (int i = 0; i < 3; ++i)
                 v[i] = parser.parse_number();
 
-            transform = scale(v[0], v[1], v[2]) * transform;
+            // TODO: why are we right-multiplying here?
+            transform = transform * scale(v[0], v[1], v[2]);
+//            transform = scale(v[0], v[1], v[2]) * transform;
         }
         else if (token == "CoordSysTransform")
         {

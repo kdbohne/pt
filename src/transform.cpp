@@ -106,7 +106,9 @@ Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up)
 {
     Vector3f forward = normalize(target - eye);
     Vector3f right = normalize(cross(forward, up));
-    Vector3f local_up = normalize(cross(right, forward));
+    Vector3f local_up = normalize(cross(right, forward)); // TODO: can this normalize() be removed?
+
+    // TODO: check forward vs up to make sure they are not parallel
 
     Matrix4x4 camera_to_world;
 
@@ -130,5 +132,5 @@ Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up)
     camera_to_world.m[3][2] = eye.z;
     camera_to_world.m[3][3] = 1;
 
-    return camera_to_world;
+    return Transform(camera_to_world);
 }
