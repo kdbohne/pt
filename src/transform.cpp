@@ -60,17 +60,14 @@ Transform rotate(float angle, const Vector3f &axis)
     m.m[0][0] = a.x * a.x + (1 - a.x * a.x) * cos_theta;
     m.m[0][1] = a.x * a.y * (1 - cos_theta) - a.z * sin_theta;
     m.m[0][2] = a.x * a.z * (1 - cos_theta) + a.y * sin_theta;
-    m.m[0][3] = 0;
 
     m.m[1][0] = a.x * a.y * (1 - cos_theta) + a.z * sin_theta;
     m.m[1][1] = a.y * a.y + (1 - a.y * a.y) * cos_theta;
     m.m[1][2] = a.y * a.z * (1 - cos_theta) - a.x * sin_theta;
-    m.m[1][3] = 0;
 
     m.m[2][0] = a.x * a.z * (1 - cos_theta) - a.y * sin_theta;
     m.m[2][1] = a.y * a.z * (1 - cos_theta) + a.x * sin_theta;
     m.m[2][2] = a.z * a.z + (1 - a.z * a.z) * cos_theta;
-    m.m[2][3] = 0;
 
     return Transform(m, transpose(m));
 }
@@ -95,11 +92,11 @@ Transform perspective(float vfov, float aspect, float n, float f)
     Matrix4x4 persp(1, 0,           0,                0,
                     0, 1,           0,                0,
                     0, 0, f / (f - n), -f * n / (f - n),
-                    0, 0,           1,                0);
+                    0, 0,          -1,                0);
 
     float inv_tan = 1 / std::tan(vfov / 2);
 
-    return scale(inv_tan / aspect, inv_tan, 1) * Transform(persp);
+    return scale(inv_tan, inv_tan, 1) * Transform(persp);
 }
 
 Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up)
@@ -115,22 +112,18 @@ Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up)
     camera_to_world.m[0][0] = right.x;
     camera_to_world.m[0][1] = right.y;
     camera_to_world.m[0][2] = right.z;
-    camera_to_world.m[0][3] = 0;
 
     camera_to_world.m[1][0] = local_up.x;
     camera_to_world.m[1][1] = local_up.y;
     camera_to_world.m[1][2] = local_up.z;
-    camera_to_world.m[1][3] = 0;
 
     camera_to_world.m[2][0] = forward.x;
     camera_to_world.m[2][1] = forward.y;
     camera_to_world.m[2][2] = forward.z;
-    camera_to_world.m[2][3] = 0;
 
     camera_to_world.m[3][0] = eye.x;
     camera_to_world.m[3][1] = eye.y;
     camera_to_world.m[3][2] = eye.z;
-    camera_to_world.m[3][3] = 1;
 
     return Transform(camera_to_world);
 }

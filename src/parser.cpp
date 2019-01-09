@@ -754,10 +754,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             Point3f target(v[3], v[4], v[5]);
             Vector3f up(v[6], v[7], v[8]);
 
-            // Convert from a left-handed to a right-handed coordinate system.
-            Transform pbrt_to_pt = scale(-1, 1, 1);
-
-            camera_to_world = pbrt_to_pt * look_at(eye, target, up);
+            camera_to_world = look_at(eye, target, up);
         }
         else if (token == "Camera")
         {
