@@ -125,5 +125,5 @@ Transform look_at(const Point3f &eye, const Point3f &target, const Vector3f &up)
     camera_to_world.m[3][1] = eye.y;
     camera_to_world.m[3][2] = eye.z;
 
-    return Transform(camera_to_world);
+    return Transform(inverse(camera_to_world), camera_to_world);
 }

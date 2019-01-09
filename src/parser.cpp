@@ -754,7 +754,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             Point3f target(v[3], v[4], v[5]);
             Vector3f up(v[6], v[7], v[8]);
 
-            camera_to_world = look_at(eye, target, up);
+            transform = look_at(eye, target, up) * transform;
         }
         else if (token == "Camera")
         {
@@ -762,6 +762,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
 
             ParameterList params = parser.parse_parameters();
             camera_fov = radians(params.find_float("fov", 90));
+            camera_to_world = inverse(transform);
         }
         else if (token == "Sampler")
         {
@@ -890,9 +891,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             for (int i = 0; i < 3; ++i)
                 v[i] = parser.parse_number();
 
-            // TODO: why are we right-multiplying here?
-            transform = transform * translate(Vector3f(v[0], v[1], v[2]));
-//            transform = translate(Vector3f(v[0], v[1], v[2])) * transform;
+            transform = translate(Vector3f(v[0], v[1], v[2])) * transform;
         }
         else if (token == "Rotate")
         {
@@ -900,9 +899,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             for (int i = 0; i < 4; ++i)
                 v[i] = parser.parse_number();
 
-            // TODO: why are we right-multiplying here?
-            transform = transform * rotate(v[0], Vector3f(v[1], v[2], v[3]));
-//            transform = rotate(v[0], Vector3f(v[1], v[2], v[3])) * transform;
+            transform = rotate(v[0], Vector3f(v[1], v[2], v[3])) * transform;
         }
         else if (token == "Scale")
         {
@@ -910,9 +907,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             for (int i = 0; i < 3; ++i)
                 v[i] = parser.parse_number();
 
-            // TODO: why are we right-multiplying here?
-            transform = transform * scale(v[0], v[1], v[2]);
-//            transform = scale(v[0], v[1], v[2]) * transform;
+            transform = scale(v[0], v[1], v[2]) * transform;
         }
         else if (token == "CoordSysTransform")
         {
