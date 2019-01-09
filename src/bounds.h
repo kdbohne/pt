@@ -3,6 +3,29 @@
 #include "point.h"
 
 template<typename T>
+struct Bounds2
+{
+    Point2<T> min, max;
+
+    Bounds2()
+    {
+        T min_value = std::numeric_limits<T>::lowest();
+        T max_value = std::numeric_limits<T>::max();
+
+        min = Point2<T>(max_value, max_value);
+        max = Point2<T>(min_value, min_value);
+    }
+
+    Bounds2(const Point2<T> &p0, const Point2<T> &p1)
+        : min(std::min(p0.x, p1.x), std::min(p0.y, p1.y)),
+          max(std::max(p0.x, p1.x), std::max(p0.y, p1.y))
+    {
+    }
+};
+
+typedef Bounds2<float> Bounds2f;
+
+template<typename T>
 struct Bounds3
 {
     Point3<T> min, max;
