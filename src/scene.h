@@ -7,8 +7,6 @@
 struct Light;
 struct Ray;
 struct Intersection;
-struct Mesh;
-struct Bsdf;
 
 struct Scene
 {
@@ -16,7 +14,4 @@ struct Scene
     std::vector<Light *> lights;
 
     bool intersect(const Ray &ray, Intersection *intersection) const;
-
-    // TODO: remove?
-    void add_mesh(Mesh *mesh, Bsdf *bsdf);
 };

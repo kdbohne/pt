@@ -5,6 +5,7 @@
 #include "ray.h"
 
 struct Entity;
+struct Bsdf;
 
 struct Intersection
 {
@@ -17,6 +18,9 @@ struct Intersection
     float time;
 
     const Entity *entity;
+
+    // TODO: separate SurfaceIntersection?
+    Bsdf *bsdf;
 
     Intersection() {}
     Intersection(const Point3f &p);

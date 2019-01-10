@@ -6,7 +6,7 @@
 
 struct Geometry;
 struct AreaLight;
-struct Bsdf;
+struct Material;
 struct Ray;
 struct Intersection;
 
@@ -14,11 +14,11 @@ struct Entity
 {
     Geometry *geometry;
     AreaLight *area_light;
-    Bsdf *bsdf;
+    Material *material;
 
     Entity() {}
-    Entity(Geometry *geometry, AreaLight *light, Bsdf *bsdf)
-        : geometry(geometry), area_light(light), bsdf(bsdf) {}
+    Entity(Geometry *geometry, AreaLight *light, Material *material)
+        : geometry(geometry), area_light(light), material(material) {}
 
     bool intersect(const Ray &ray, Intersection *intersection) const;
 };

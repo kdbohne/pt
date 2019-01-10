@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "math.h"
 
 template<int N>
 struct CoefficientSpectrum
@@ -94,6 +95,15 @@ struct CoefficientSpectrum
                 return false;
         }
         return true;
+    }
+
+    CoefficientSpectrum<N> clamp(float min = 0, float max = INFINITY) const
+    {
+        CoefficientSpectrum<N> result;
+        for (int i = 0; i < N; ++i)
+            result.c[i] = ::clamp(c[i], min, max);
+
+        return result;
     }
 };
 

@@ -7,6 +7,7 @@
 #include "camera.h"
 #include "film.h"
 #include "sampler.h"
+#include "material.h"
 
 Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its, const Ray &ray, int depth, BxdfType type) const
 {
@@ -15,7 +16,7 @@ Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its
     Vector3f wi;
     float pdf;
     BxdfType sampled_type;
-    Spectrum f = its.entity->bsdf->sample_f(its, its.wo, &wi, u, &pdf, type, &sampled_type);
+    Spectrum f = its.bsdf->sample_f(its, its.wo, &wi, u, &pdf, type, &sampled_type);
 
     if ((pdf > 0) && !f.is_black() && (abs_dot(wi, its.n) != 0))
         return f * Li(scene, its.spawn_ray(wi), depth + 1) * abs_dot(wi, its.n) / pdf;
@@ -46,8 +47,13 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
         return Spectrum(0);
     }
 
+    if (!its.entity->material)
+        return Spectrum(0);
+
+    its.entity->material->evaluate_surface(ray, &its);
+
 #if 1
-    if (!its.entity->bsdf)
+    if (!its.bsdf)
         return Spectrum(0);
 #else
     // TODO: fix this
@@ -77,7 +83,7 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
         if ((pdf == 0) || Li.is_black())
             continue;
 
-        Spectrum f = its.entity->bsdf->f(its, wo, wi);
+        Spectrum f = its.bsdf->f(its, wo, wi);
 
         if (!f.is_black() && vis.unoccluded(scene))
             L += f * Li * abs_dot(wi, n) / pdf;

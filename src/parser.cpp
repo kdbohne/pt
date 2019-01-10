@@ -9,6 +9,8 @@
 #include "scene.h"
 #include "light.h"
 #include "sampler.h"
+#include "material.h"
+#include "texture.h"
 
 #include <cstdio>
 
@@ -522,14 +524,15 @@ struct Parser
     }
 };
 
-static Bsdf *make_material(const std::string &name, const ParameterList &params)
+static Material *make_material(const std::string &name, const ParameterList &params)
 {
-    // TODO: reduce duplication here; creating a new BSDF per call
+    // TODO MEMORY: creating a new material/textures per call
+    // TODO: allow non-constant textures
 
     if (name == "matte")
     {
         Spectrum Kd = params.find_spectrum("Kd", Spectrum(0.5));
-        return make_matte_material(Kd);
+        return new MatteMaterial(new ConstantTexture<Spectrum>(Kd));
     }
 
     if (name == "plastic")
@@ -539,7 +542,10 @@ static Bsdf *make_material(const std::string &name, const ParameterList &params)
         float roughness = params.find_float("roughness", 0.1);
         bool remap_roughness = params.find_bool("remaproughness", true);
 
-        return make_plastic_material(Kd, Ks, roughness, remap_roughness);
+        return new PlasticMaterial(new ConstantTexture<Spectrum>(Kd),
+                                   new ConstantTexture<Spectrum>(Ks),
+                                   new ConstantTexture<float>(roughness),
+                                   remap_roughness);
     }
 
     if (name == "glass")
@@ -551,7 +557,12 @@ static Bsdf *make_material(const std::string &name, const ParameterList &params)
         float v_roughness = params.find_float("vroughness", 0);
         bool remap_roughness = params.find_bool("remaproughness", true);
 
-        return make_glass_material(Kr, Kt, u_roughness, v_roughness, eta, remap_roughness);
+        return new GlassMaterial(new ConstantTexture<Spectrum>(Kr),
+                                 new ConstantTexture<Spectrum>(Kt),
+                                 new ConstantTexture<float>(u_roughness),
+                                 new ConstantTexture<float>(v_roughness),
+                                 new ConstantTexture<float>(eta),
+                                 remap_roughness);
     }
 
     // TODO: file/line/column info
@@ -869,11 +880,11 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                     scene->lights.push_back(area_light);
                 }
 
-                // TODO FIXME: use bsdf params instead of geometry's params
-                // TODO: avoid duplicating BSDF per geometry
-                Bsdf *bsdf = make_material(graphics_state.material, params);
+                // TODO FIXME: use material params instead of geometry's params
+                // TODO: avoid duplicating material per geometry
+                Material *material = make_material(graphics_state.material, params);
 
-                scene->entities.push_back(Entity(geometry, area_light, bsdf));
+                scene->entities.push_back(Entity(geometry, area_light, material));
             }
         }
         else if (token == "Texture")
