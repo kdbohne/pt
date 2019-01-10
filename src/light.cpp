@@ -17,7 +17,7 @@ bool VisibilityTest::unoccluded(const Scene &scene)
     return !scene.intersect(p0.spawn_ray_to(p1), &is);
 }
 
-Spectrum Light::Le(const Vector3f &wo) const
+Spectrum Light::Le(const Ray &ray) const
 {
     return Spectrum(0);
 }

@@ -31,7 +31,7 @@ struct Light
 
     virtual void preprocess(const Scene &scene) {}
 
-    virtual Spectrum Le(const Vector3f &wo) const;
+    virtual Spectrum Le(const Ray &ray) const;
     virtual Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const = 0;
     virtual Spectrum power() const = 0;
 };
