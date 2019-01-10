@@ -814,6 +814,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             std::string type = parser.parse_string();
 
             ParameterList params = parser.parse_parameters();
+            Spectrum scale = params.find_spectrum("scale", Spectrum(1, 1, 1));
 
             if (type == "point")
             {
@@ -827,7 +828,17 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                 Point3f to = params.find_point3f("to", Point3f(0, 0, 1));
                 Vector3f w = normalize(from - to);
 
-                DirectionalLight *light = new DirectionalLight(transform, L, w);
+                DirectionalLight *light = new DirectionalLight(transform, L * scale, w);
+                scene->lights.push_back(light);
+            }
+            else if (type == "infinite")
+            {
+                Spectrum L = params.find_spectrum("L", Spectrum(1, 1, 1));
+                int samples_count = params.find_int("samples", 1);
+                std::string relative_texture_path = params.find_string("mapname", "");
+                std::string absolute_texture_path = input_directory + "/" + relative_texture_path;
+
+                InfiniteAreaLight *light = new InfiniteAreaLight(transform, L * scale, samples_count, absolute_texture_path);
                 scene->lights.push_back(light);
             }
             else
@@ -948,6 +959,13 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             std::string absolute_path = input_directory + "/" + relative_path;
 
             parser.include(absolute_path);
+        }
+        else if (token == "PixelFilter")
+        {
+            // TODO FIXME UNUSED
+            std::string type = parser.parse_string();
+
+            ParameterList params = parser.parse_parameters();
         }
         else
         {

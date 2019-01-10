@@ -8,6 +8,8 @@
 #include "geometry.h"
 
 struct Scene;
+template<typename T> struct Mipmap;
+struct Distribution2d;
 
 class VisibilityTest
 {
@@ -82,6 +84,26 @@ struct DiffuseAreaLight : public AreaLight
 
     Spectrum L(const Intersection &its, const Vector3f &w) const override;
 
+    Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const override;
+    Spectrum power() const override;
+};
+
+// NOTE: although InfiniteAreaLight is an area light, it only inherits from
+// Light rather than Light's subclass AreaLight.
+struct InfiniteAreaLight : public Light
+{
+    Mipmap<RgbSpectrum> *Lmap;
+
+    Distribution2d *distribution;
+
+    Point3f world_center;
+    float world_radius;
+
+    InfiniteAreaLight(const Transform &light_to_world, const Spectrum &L, int samples_count, const std::string &texture_path);
+
+    void preprocess(const Scene &scene) override;
+
+    Spectrum Le(const Ray &ray) const override;
     Spectrum sample_Li(const Intersection &ref, const Point2f &u, Vector3f *wi, float *pdf, VisibilityTest *vis) const override;
     Spectrum power() const override;
 };

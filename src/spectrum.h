@@ -3,6 +3,12 @@
 #include "common.h"
 #include "math.h"
 
+enum class SpectrumType
+{
+    REFLECTANCE,
+    ILLUMINANT
+};
+
 template<int N>
 struct CoefficientSpectrum
 {
@@ -47,6 +53,14 @@ struct CoefficientSpectrum
             result.c[i] *= s.c[i];
 
         return result;
+    }
+
+    CoefficientSpectrum<N> &operator*=(const CoefficientSpectrum<N> &s)
+    {
+        for (int i = 0; i < N; ++i)
+            c[i] *= s.c[i];
+
+        return *this;
     }
 
     CoefficientSpectrum<N> operator*(float s) const
@@ -117,9 +131,11 @@ struct RgbSpectrum : public CoefficientSpectrum<3>
 {
     RgbSpectrum(float v = 0.0);
     RgbSpectrum(float r, float g, float b);
-    RgbSpectrum(const CoefficientSpectrum<3> &v);
+    RgbSpectrum(const CoefficientSpectrum<3> &v, SpectrumType type = SpectrumType::REFLECTANCE);
 
     void to_xyz(float xyz[3]) const;
+
+    float y() const;
 };
 
 // TODO: SampledSpectrum
@@ -129,3 +145,8 @@ typedef RgbSpectrum Spectrum;
 
 void xyz_to_rgb(const float xyz[3], float rgb[3]);
 void rgb_to_xyz(const float rgb[3], float xyz[3]);
+
+inline RgbSpectrum lerp(float t, const RgbSpectrum &s0, const RgbSpectrum &s1)
+{
+    return (1 - t) * s0 + t * s1;
+}

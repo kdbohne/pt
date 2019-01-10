@@ -5,7 +5,7 @@ RgbSpectrum::RgbSpectrum(float v)
 {
 }
 
-RgbSpectrum::RgbSpectrum(const CoefficientSpectrum<3> &v)
+RgbSpectrum::RgbSpectrum(const CoefficientSpectrum<3> &v, SpectrumType type)
     : CoefficientSpectrum<3>(v)
 {
 }
@@ -20,6 +20,12 @@ RgbSpectrum::RgbSpectrum(float r, float g, float b)
 void RgbSpectrum::to_xyz(float xyz[3]) const
 {
     rgb_to_xyz(c, xyz);
+}
+
+float RgbSpectrum::y() const
+{
+    const float y_weight[3] = {0.212671, 0.715160, 0.072169};
+    return y_weight[0] * c[0] + y_weight[1] * c[1] + y_weight[2] * c[2];
 }
 
 void xyz_to_rgb(const float xyz[3], float rgb[3])

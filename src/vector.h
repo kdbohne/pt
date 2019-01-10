@@ -1,7 +1,9 @@
 #pragma once
 
-#include <cmath>
 #include "common.h"
+#include "math.h"
+
+#include <cmath>
 
 template<typename T>
 struct Normal3;
@@ -224,4 +226,15 @@ inline Vector3f spherical_direction(float sin_theta, float cos_theta, float phi,
     return sin_theta * std::cos(phi) * x +
            sin_theta * std::sin(phi) * y +
            cos_theta * z;
+}
+
+inline float spherical_theta(const Vector3f &v)
+{
+    return std::acos(clamp(v.z, -1, 1));
+}
+
+inline float spherical_phi(const Vector3f &v)
+{
+    float p = std::atan2(v.y, v.x);
+    return (p < 0) ? p + 2 * PI : p;
 }

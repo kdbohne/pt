@@ -126,8 +126,12 @@ void WhittedIntegrator::render(const Scene &scene, const Camera &camera) const
             L /= (float)sampler->samples_per_pixel;
 
             film->set_pixel(x, y, L);
+
+            float progress = (float)(y * film->resolution.x + x) / (float)(film->resolution.x * film->resolution.y);
+            std::printf("\r%0.2f%%", progress * 100);
         }
     }
+    std::printf("\n");
 
     // TODO: configurable output path/type
     camera.film->write_ppm("out.ppm");

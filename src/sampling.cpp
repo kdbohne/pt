@@ -53,3 +53,63 @@ float uniform_cone_pdf(float cos_theta_max)
 {
     return 1 / (2 * PI * (1 - cos_theta_max));
 }
+
+Distribution1d::Distribution1d(const float *f, int n)
+    : func(f, f + n), cdf(n + 1)
+{
+    cdf[0] = 0;
+    for (int i = 1; i < n + 1; ++i)
+        cdf[i] = cdf[i - 1] + func[i - 1] / n;
+
+    func_int = cdf[n];
+    if (func_int == 0)
+    {
+        for (int i = 1; i < n + 1; ++i)
+            cdf[i] = (float)i / (float)n;
+    }
+    else
+    {
+        for (int i = 1; i < n + 1; ++i)
+            cdf[i] /= func_int;
+    }
+}
+
+float Distribution1d::sample_continuous(float u, float *pdf, int *offset) const
+{
+    int off = find_interval(cdf.size(), [&](int index) { return cdf[index] <= u; });
+    if (offset)
+        *offset = off;
+
+    float du = u - cdf[off];
+    if ((cdf[off + 1] - cdf[off]) > 0)
+        du /= (cdf[off + 1] - cdf[off]);
+
+    if (pdf)
+        *pdf = func[off] / func_int;
+
+    int count = (int)func.size();
+    return (off + du) / count;
+}
+
+Distribution2d::Distribution2d(float *func, int nu, int nv)
+{
+    for (int v = 0; v < nv; ++v)
+        p_conditional_v.emplace_back(new Distribution1d(&func[v * nu], nu));
+
+    std::vector<float> marginal_func;
+    for (int v = 0; v < nv; ++v)
+        marginal_func.push_back(p_conditional_v[v]->func_int);
+    p_marginal = new Distribution1d(&marginal_func[0], nv);
+}
+
+Point2f Distribution2d::sample_continuous(const Point2f &u, float *pdf) const
+{
+    float pdfs[2];
+    int v;
+    float d1 = p_marginal->sample_continuous(u[1], &pdfs[1], &v);
+    float d0 = p_conditional_v[v]->sample_continuous(u[0], &pdfs[0]);
+
+    *pdf = pdfs[0] * pdfs[1];
+
+    return Point2f(d0, d1);
+}

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #define UNUSED(x) ((void)(x))
 
 void report_(const char *prefix, bool fatal, const char *format, ...) __attribute__((__format__(__printf__, 3, 4)));

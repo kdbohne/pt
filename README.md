@@ -12,7 +12,8 @@ for the purpose of learning the intricacies of a photorealistic renderer.
 Building pt
 -----------
 
-pt does not have any external dependencies. Simply clone the repository and run `make`.
+pt depends on OpenEXR. With this library installed, simply clone the repository
+and run `make`.
 
 ```bash
 $ git clone https://github.com/kdbohne/pt
@@ -37,5 +38,6 @@ License
 
 This source code is provided under the MIT License. Much of the code is based
 on the source code of [pbrt-v3](https://github.com/mmp/pbrt-v3), which is
-provided under the BSD 2-Clause "Simplified" License. The full text of these
-licenses is provided in the `LICENSE.txt` file located in this repository.
+provided under the BSD 2-Clause "Simplified" License. The licenses of all
+external dependencies are also provided. The full text of these licenses can be
+found in the `LICENSE.txt` file located in this repository.
