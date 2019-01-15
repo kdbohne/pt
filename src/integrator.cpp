@@ -134,7 +134,8 @@ void WhittedIntegrator::render(const Scene &scene, const Camera &camera) const
     std::printf("\n");
 
     // TODO: configurable output path/type
-    camera.film->write_ppm("out.ppm");
+//    camera.film->write_ppm("out.ppm");
+    camera.film->write_exr("out.exr");
 }
 
 #if 0

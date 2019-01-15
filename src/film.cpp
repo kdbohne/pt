@@ -1,6 +1,9 @@
 #include "film.h"
 #include <fstream>
 
+#include <OpenEXR/ImfRgba.h>
+#include <OpenEXR/ImfRgbaFile.h>
+
 Film::Film(const Point2i &resolution)
     : resolution(resolution), pixels(resolution.x * resolution.y)
 {
@@ -62,4 +65,20 @@ void Film::write_ppm(const std::string &path) const
 
         file << "\n";
     }
+}
+
+void Film::write_exr(const std::string &path) const
+{
+    Imf::Rgba *rgba = new Imf::Rgba[resolution.x * resolution.y];
+    for (int i = 0; i < resolution.x * resolution.y; ++i)
+    {
+        float rgb[3];
+        xyz_to_rgb(pixels[i].xyz, rgb);
+
+        rgba[i] = Imf::Rgba(rgb[0], rgb[1], rgb[2]);
+    }
+
+    Imf::RgbaOutputFile file(path.c_str(), resolution.x, resolution.y, Imf::WRITE_RGB);
+    file.setFrameBuffer(rgba, 1, resolution.x);
+    file.writePixels(resolution.y);
 }

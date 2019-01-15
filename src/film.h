@@ -21,4 +21,5 @@ struct Film
     void set_pixel(int x, int y, const Spectrum &v);
 
     void write_ppm(const std::string &path) const;
+    void write_exr(const std::string &path) const;
 };
