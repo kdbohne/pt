@@ -8,8 +8,9 @@
 #include "film.h"
 #include "sampler.h"
 #include "material.h"
+#include "memory.h"
 
-Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its, const Ray &ray, int depth, BxdfType type) const
+Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its, const Ray &ray, MemoryArena &arena, int depth, BxdfType type) const
 {
     Point2f u(uniform_float(), uniform_float()); // TODO: better sampling?
 
@@ -19,24 +20,24 @@ Spectrum Integrator::specular_common(const Scene &scene, const Intersection &its
     Spectrum f = its.bsdf->sample_f(its, its.wo, &wi, u, &pdf, type, &sampled_type);
 
     if ((pdf > 0) && !f.is_black() && (abs_dot(wi, its.n) != 0))
-        return f * Li(scene, its.spawn_ray(wi), depth + 1) * abs_dot(wi, its.n) / pdf;
+        return f * Li(scene, its.spawn_ray(wi), arena, depth + 1) * abs_dot(wi, its.n) / pdf;
 
     return Spectrum(0);
 }
 
-Spectrum Integrator::specular_reflect(const Scene &scene, const Intersection &its, const Ray &ray, int depth) const
+Spectrum Integrator::specular_reflect(const Scene &scene, const Intersection &its, const Ray &ray, MemoryArena &arena, int depth) const
 {
     BxdfType type = (BxdfType)(BSDF_SPECULAR | BSDF_REFLECTION);
-    return specular_common(scene, its, ray, depth, type);
+    return specular_common(scene, its, ray, arena, depth, type);
 }
 
-Spectrum Integrator::specular_transmit(const Scene &scene, const Intersection &its, const Ray &ray, int depth) const
+Spectrum Integrator::specular_transmit(const Scene &scene, const Intersection &its, const Ray &ray, MemoryArena &arena, int depth) const
 {
     BxdfType type = (BxdfType)(BSDF_SPECULAR | BSDF_TRANSMISSION);
-    return specular_common(scene, its, ray, depth, type);
+    return specular_common(scene, its, ray, arena, depth, type);
 }
 
-Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) const
+Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, MemoryArena &arena, int depth) const
 {
     Spectrum L(0);
 
@@ -50,7 +51,7 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
     if (!its.entity->material)
         return Spectrum(0);
 
-    its.entity->material->evaluate_surface(ray, &its);
+    its.entity->material->evaluate_surface(ray, arena, &its);
 
 #if 1
     if (!its.bsdf)
@@ -91,8 +92,8 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
 
     if (depth + 1 < max_depth)
     {
-        L += specular_reflect(scene, its, ray, depth);
-        L += specular_transmit(scene, its, ray, depth);
+        L += specular_reflect(scene, its, ray, arena, depth);
+        L += specular_transmit(scene, its, ray, arena, depth);
     }
 
     return L;
@@ -102,6 +103,8 @@ Spectrum WhittedIntegrator::Li(const Scene &scene, const Ray &ray, int depth) co
 void WhittedIntegrator::render(const Scene &scene, const Camera &camera) const
 {
     Film *film = camera.film;
+
+    MemoryArena arena;
 
     for (int y = 0; y < film->resolution.y; ++y)
     {
@@ -118,7 +121,7 @@ void WhittedIntegrator::render(const Scene &scene, const Camera &camera) const
                 Ray ray;
                 camera.generate_ray(cs, &ray);
 
-                L += Li(scene, ray);
+                L += Li(scene, ray, arena);
             }
             while (sampler->start_next_sample());
 
@@ -126,6 +129,8 @@ void WhittedIntegrator::render(const Scene &scene, const Camera &camera) const
             L /= (float)sampler->samples_per_pixel;
 
             film->set_pixel(x, y, L);
+
+            arena.reset();
 
             float progress = (float)(y * film->resolution.x + x) / (float)(film->resolution.x * film->resolution.y);
             std::printf("\r%0.2f%%", progress * 100);

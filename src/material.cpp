@@ -2,25 +2,26 @@
 #include "bsdf.h"
 #include "texture.h"
 #include "intersection.h"
+#include "memory.h"
 
 // TODO MEMORY: use a pool allocator or memory arena for each allocation here
 
-void MatteMaterial::evaluate_surface(const Ray &ray, Intersection *its) const
+void MatteMaterial::evaluate_surface(const Ray &ray, MemoryArena &arena, Intersection *its) const
 {
-    its->bsdf = new Bsdf();
+    its->bsdf = ARENA_ALLOC(arena, Bsdf)();
 
     Spectrum r = Kd->evaluate(*its).clamp();
     if (!r.is_black())
-        its->bsdf->add(new LambertianReflection(r));
+        its->bsdf->add(ARENA_ALLOC(arena, LambertianReflection)(r));
 }
 
-void PlasticMaterial::evaluate_surface(const Ray &ray, Intersection *its) const
+void PlasticMaterial::evaluate_surface(const Ray &ray, MemoryArena &arena, Intersection *its) const
 {
-    its->bsdf = new Bsdf();
+    its->bsdf = ARENA_ALLOC(arena, Bsdf)();
 
     Spectrum kd = Kd->evaluate(*its).clamp();
     if (!kd.is_black())
-        its->bsdf->add(new LambertianReflection(kd));
+        its->bsdf->add(ARENA_ALLOC(arena, LambertianReflection)(kd));
 
     Spectrum ks = Ks->evaluate(*its).clamp();
     if (!ks.is_black())
@@ -29,16 +30,16 @@ void PlasticMaterial::evaluate_surface(const Ray &ray, Intersection *its) const
         if (remap_roughness)
             rough = TrowbridgeReitzDistribution::roughness_to_alpha(rough);
 
-        MicrofacetDistribution *distribution = new TrowbridgeReitzDistribution(rough, rough);
-        Fresnel *fresnel = new FresnelDielectric(1, 1.5);
-        MicrofacetReflection *specular = new MicrofacetReflection(ks, distribution, fresnel);
+        MicrofacetDistribution *distribution = ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(rough, rough);
+        Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1, 1.5);
+        MicrofacetReflection *specular = ARENA_ALLOC(arena, MicrofacetReflection)(ks, distribution, fresnel);
         its->bsdf->add(specular);
     }
 }
 
-void GlassMaterial::evaluate_surface(const Ray &ray, Intersection *its) const
+void GlassMaterial::evaluate_surface(const Ray &ray, MemoryArena &arena, Intersection *its) const
 {
-    its->bsdf = new Bsdf();
+    its->bsdf = ARENA_ALLOC(arena, Bsdf)();
 
     Spectrum kr = Kr->evaluate(*its).clamp();
     Spectrum kt = Kt->evaluate(*its).clamp();
@@ -53,7 +54,7 @@ void GlassMaterial::evaluate_surface(const Ray &ray, Intersection *its) const
     bool allow_multiple_lobes = false; // TODO: configurable?
     if (is_specular && allow_multiple_lobes)
     {
-        its->bsdf->add(new FresnelSpecular(kr, kt, 1, eta));
+        its->bsdf->add(ARENA_ALLOC(arena, FresnelSpecular)(kr, kt, 1, eta));
         return;
     }
 
@@ -65,22 +66,22 @@ void GlassMaterial::evaluate_surface(const Ray &ray, Intersection *its) const
 
     MicrofacetDistribution *distribution = nullptr;
     if (!is_specular)
-        distribution = new TrowbridgeReitzDistribution(u_rough, v_rough);
+        distribution = ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(u_rough, v_rough);
 
     if (!kr.is_black())
     {
-        Fresnel *fresnel = new FresnelDielectric(1, eta);
+        Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1, eta);
         if (is_specular)
-            its->bsdf->add(new SpecularReflection(kr, fresnel));
+            its->bsdf->add(ARENA_ALLOC(arena, SpecularReflection)(kr, fresnel));
         else
-            its->bsdf->add(new MicrofacetReflection(kr, distribution, fresnel));
+            its->bsdf->add(ARENA_ALLOC(arena, MicrofacetReflection)(kr, distribution, fresnel));
     }
 
     if (!kt.is_black())
     {
         if (is_specular)
-            its->bsdf->add(new SpecularTransmission(kt, 1, eta));
+            its->bsdf->add(ARENA_ALLOC(arena, SpecularTransmission)(kt, 1, eta));
         else
-            its->bsdf->add(new MicrofacetTransmission(kt, distribution, 1, eta));
+            its->bsdf->add(ARENA_ALLOC(arena, MicrofacetTransmission)(kt, distribution, 1, eta));
     }
 }

@@ -5,7 +5,7 @@ CXXFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable # TO
 
 LDFLAGS += $(shell pkg-config --libs OpenEXR)
 
-OBJECTS := main.o common.o matrix.o transform.o camera.o film.o geometry.o light.o spectrum.o sampling.o bsdf.o intersection.o entity.o scene.o integrator.o parser.o sampler.o material.o texture.o
+OBJECTS := main.o common.o matrix.o transform.o camera.o film.o geometry.o light.o spectrum.o sampling.o bsdf.o intersection.o entity.o scene.o integrator.o parser.o sampler.o material.o texture.o memory.o
 OBJECTS := $(addprefix build/, $(OBJECTS))
 
 .PHONY: default

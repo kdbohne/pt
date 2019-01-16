@@ -53,6 +53,9 @@ struct Bsdf
 
     Spectrum f(const Intersection &its, const Vector3f &wo, const Vector3f &wi, BxdfType flags = BSDF_ALL) const;
     Spectrum sample_f(const Intersection &its, const Vector3f &wo, Vector3f *wi, const Point2f &u, float *pdf, BxdfType type = BSDF_ALL, BxdfType *sampled_type = nullptr) const;
+
+private:
+    ~Bsdf() {}
 };
 
 struct LambertianReflection : public Bxdf
