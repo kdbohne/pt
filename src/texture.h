@@ -124,18 +124,25 @@ Mipmap<T>::Mipmap(const Point2i &res, const T *data)
 
         // TODO FIXME
         // Resample in t-direction.
-#if 0
         ResampleWeight *t_weights = resample_weights(resolution[1], res_pow2[1]);
         for (int s = 0; s < res_pow2[0]; ++s)
         {
             for (int t = 0; t < res_pow2[1]; ++t)
             {
-            }
+                T value = 0;
+                for (int j = 0; j < 4; ++j)
+                {
+                    int offset = t_weights[t].first_texel + j;
+                    // TODO: wrap mode option; always clamping for now
+                    offset = clamp(offset, 0, resolution[1] - 1);
 
-            for (int t = 0; t < res_pow2[1]; ++t)
-                resampled_image[t * res_pow2[0] + s] = clamp(?????);
+                    if ((offset >= 0) && (offset < resolution[1]))
+                        value += t_weights[t].weight[j] * resampled_image[offset * res_pow2[0] + s];
+                }
+
+                resampled_image[t * res_pow2[0] + s] = value.clamp(0, INFINITY);
+            }
         }
-#endif
 
         resolution = res_pow2;
     }
