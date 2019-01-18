@@ -76,16 +76,20 @@ Distribution1d::Distribution1d(const float *f, int n)
 
 float Distribution1d::sample_continuous(float u, float *pdf, int *offset) const
 {
-    int off = find_interval(cdf.size(), [&](int index) { return cdf[index] <= u; });
+    int off = find_interval((int)cdf.size(), [&](int index) { return cdf[index] <= u; });
     if (offset)
         *offset = off;
 
     float du = u - cdf[off];
     if ((cdf[off + 1] - cdf[off]) > 0)
+    {
+        assert(cdf[off + 1] > cdf[off]);
         du /= (cdf[off + 1] - cdf[off]);
+    }
+    assert(!std::isnan(du));
 
     if (pdf)
-        *pdf = func[off] / func_int;
+        *pdf = (func_int > 0) ? func[off] / func_int : 0;
 
     int count = (int)func.size();
     return (off + du) / count;
@@ -93,12 +97,15 @@ float Distribution1d::sample_continuous(float u, float *pdf, int *offset) const
 
 Distribution2d::Distribution2d(float *func, int nu, int nv)
 {
+    p_conditional_v.reserve(nv);
     for (int v = 0; v < nv; ++v)
         p_conditional_v.emplace_back(new Distribution1d(&func[v * nu], nu));
 
     std::vector<float> marginal_func;
+    marginal_func.reserve(nv);
     for (int v = 0; v < nv; ++v)
         marginal_func.push_back(p_conditional_v[v]->func_int);
+
     p_marginal = new Distribution1d(&marginal_func[0], nv);
 }
 
