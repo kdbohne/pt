@@ -15,7 +15,9 @@ template<typename T>
 struct Texture
 {
     virtual ~Texture() {}
+
     virtual T evaluate(const Intersection &its) const = 0;
+    virtual T lookup(const Point2f &st) const;
 };
 
 template<typename T>
@@ -29,6 +31,24 @@ struct ConstantTexture : public Texture<T>
     {
         return value;
     }
+
+    T lookup(const Point2f &st) const override
+    {
+        return value;
+    }
+};
+
+template<typename T>
+struct ImageTexture : public Texture<T>
+{
+    Point2i resolution;
+    T *data; // TODO SPEED: BlockedArray
+
+    ImageTexture(const Point2i &resolution, T *data)
+        : resolution(resolution), data(data) {}
+
+    T evaluate(const Intersection &its) const override;
+    T lookup(const Point2f &st) const override;
 };
 
 template<typename T>
@@ -50,6 +70,25 @@ struct Mipmap
     const T &texel(int level, int s, int t) const;
     T triangle(int level, const Point2f &st) const;
 };
+
+template<typename T>
+T ImageTexture<T>::evaluate(const Intersection &its) const
+{
+    // TODO FIXME
+    return 0;
+}
+
+template<typename T>
+T ImageTexture<T>::lookup(const Point2f &st) const
+{
+    assert((st.x >= 0) && (st.x <= 1));
+    assert((st.y >= 0) && (st.y <= 1));
+
+    int x = (int)(st.x * (resolution.x - 1));
+    int y = (int)(st.y * (resolution.y - 1));
+
+    return data[y * resolution.x + x];
+}
 
 struct ResampleWeight
 {

@@ -8,7 +8,8 @@
 #include "geometry.h"
 
 struct Scene;
-template<typename T> struct Mipmap;
+template<typename T> struct Texture;
+//template<typename T> struct Mipmap;
 struct Distribution2d;
 
 class VisibilityTest
@@ -92,7 +93,8 @@ struct DiffuseAreaLight : public AreaLight
 // Light rather than Light's subclass AreaLight.
 struct InfiniteAreaLight : public Light
 {
-    Mipmap<RgbSpectrum> *Lmap;
+    Texture<RgbSpectrum> *Lmap;
+//    Mipmap<RgbSpectrum> *Lmap;
 
     Distribution2d *distribution;
 

@@ -22,6 +22,11 @@ void RgbSpectrum::to_xyz(float xyz[3]) const
     rgb_to_xyz(c, xyz);
 }
 
+RgbSpectrum RgbSpectrum::to_rgb_spectrum() const
+{
+    return *this;
+}
+
 float RgbSpectrum::y() const
 {
     const float y_weight[3] = {0.212671, 0.715160, 0.072169};

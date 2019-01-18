@@ -113,10 +113,11 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &light_to_world, const Spec
     {
         resolution = Point2i(1, 1);
         texels = new RgbSpectrum[1];
-        texels[0] = L;
+        texels[0] = L.to_rgb_spectrum();
     }
 
-    Lmap = new Mipmap(resolution, texels);
+    Lmap = new ImageTexture(resolution, texels);
+//    Lmap = new Mipmap(resolution, texels);
 
     int width = resolution.x;
     int height = resolution.y;
@@ -125,12 +126,13 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &light_to_world, const Spec
     float *img = new float[width * height];
     for (int v = 0; v < height; ++v)
     {
-        float vp = (float)v / (float)height;
+        float vp = (float)(v + 0.5) / (float)height;
         float sin_theta = std::sin(PI * (v + 0.5) / (float)height);
         for (int u = 0; u < width; ++u)
         {
-            float up = (float)u / (float)width;
-            img[v * width + u] = Lmap->lookup(Point2f(up, vp), filter).y() * sin_theta;
+            float up = (float)(u + 0.5) / (float)width;
+            img[v * width + u] = Lmap->lookup(Point2f(up, vp)).y() * sin_theta;
+//            img[v * width + u] = Lmap->lookup(Point2f(up, vp), filter).y() * sin_theta;
         }
     }
 
@@ -189,6 +191,7 @@ Spectrum InfiniteAreaLight::sample_Li(const Intersection &ref, const Point2f &u,
 
 Spectrum InfiniteAreaLight::power() const
 {
-    Spectrum L = Spectrum(Lmap->lookup(Point2f(0.5, 0.5), 0.5), SpectrumType::ILLUMINANT);
+    Spectrum L = Spectrum(Lmap->lookup(Point2f(0.5, 0.5)), SpectrumType::ILLUMINANT);
+//    Spectrum L = Spectrum(Lmap->lookup(Point2f(0.5, 0.5), 0.5), SpectrumType::ILLUMINANT);
     return PI * world_radius * world_radius * L;
 }

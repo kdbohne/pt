@@ -134,6 +134,7 @@ struct RgbSpectrum : public CoefficientSpectrum<3>
     RgbSpectrum(const CoefficientSpectrum<3> &v, SpectrumType type = SpectrumType::REFLECTANCE);
 
     void to_xyz(float xyz[3]) const;
+    RgbSpectrum to_rgb_spectrum() const;
 
     float y() const;
 };
