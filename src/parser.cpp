@@ -733,6 +733,8 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
     if (!parser.c())
         return false;
 
+    int samples_per_pixel;
+
     Transform camera_to_world;
     float camera_fov = radians(90);
     Point2i film_resolution(640, 480);
@@ -783,6 +785,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
             std::string type = parser.parse_string();
 
             ParameterList params = parser.parse_parameters();
+            samples_per_pixel = params.find_int("pixelsamples", 1);
         }
         else if (token == "Integrator")
         {
@@ -976,7 +979,7 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
     Film *film = new Film(film_resolution);
     *camera = new Camera(camera_to_world, camera_fov, film);
 
-    RandomSampler *sampler = new RandomSampler(4);
+    RandomSampler *sampler = new RandomSampler(samples_per_pixel);
     *integrator = new WhittedIntegrator(5, sampler);
 
     return true;
