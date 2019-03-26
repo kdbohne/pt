@@ -147,7 +147,9 @@ struct ParameterList
 struct GraphicsState
 {
     // TODO: store more state, see GraphicsState in pbrt's api.cpp, line 201
-    std::string material;
+
+    std::string material_type;
+    ParameterList material_params;
 
     std::string area_light_type;
     ParameterList area_light_params;
@@ -524,18 +526,18 @@ struct Parser
     }
 };
 
-static Material *make_material(const std::string &name, const ParameterList &params)
+static Material *make_material(const std::string &type, const ParameterList &params)
 {
     // TODO MEMORY: creating a new material/textures per call
     // TODO: allow non-constant textures
 
-    if (name == "matte")
+    if (type == "matte")
     {
         Spectrum Kd = params.find_spectrum("Kd", Spectrum(0.5));
         return new MatteMaterial(new ConstantTexture<Spectrum>(Kd));
     }
 
-    if (name == "plastic")
+    if (type == "plastic")
     {
         Spectrum Kd = params.find_spectrum("Kd", Spectrum(0.25));
         Spectrum Ks = params.find_spectrum("Ks", Spectrum(0.25));
@@ -548,7 +550,7 @@ static Material *make_material(const std::string &name, const ParameterList &par
                                    remap_roughness);
     }
 
-    if (name == "glass")
+    if (type == "glass")
     {
         Spectrum Kr = params.find_spectrum("Kr", Spectrum(1));
         Spectrum Kt = params.find_spectrum("Kt", Spectrum(1));
@@ -566,7 +568,7 @@ static Material *make_material(const std::string &name, const ParameterList &par
     }
 
     // TODO: file/line/column info
-    error("Unknown material: \"%s\"", name.c_str());
+    error("Unknown material type: \"%s\"", type.c_str());
     return nullptr;
 }
 
@@ -864,11 +866,9 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
         }
         else if (token == "Material")
         {
-            std::string name = parser.parse_string();
-            graphics_state.material = name;
-
-            // TODO FIXME
-            ParameterList params = parser.parse_parameters();
+            std::string type = parser.parse_string();
+            graphics_state.material_type = type;
+            graphics_state.material_params = parser.parse_parameters();
         }
         else if (token == "Shape")
         {
@@ -891,9 +891,8 @@ bool parse_pbrt(const std::string &path, Scene *scene, Camera **camera, Integrat
                     scene->lights.push_back(area_light);
                 }
 
-                // TODO FIXME: use material params instead of geometry's params
                 // TODO: avoid duplicating material per geometry
-                Material *material = make_material(graphics_state.material, params);
+                Material *material = make_material(graphics_state.material_type, graphics_state.material_params);
 
                 scene->entities.push_back(Entity(geometry, area_light, material));
             }
